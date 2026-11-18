@@ -57,6 +57,7 @@ fun AppRoot(
             Screen.Editor -> EditorScreen(
                 vm = editor,
                 onNext = { nav.go(Screen.Details(null)) },
+                onSavedEdit = nav::back,
                 onBack = nav::back,
             )
             is Screen.Details -> DetailsScreen(
@@ -68,6 +69,10 @@ fun AppRoot(
             is Screen.CardView -> CardScreen(
                 id = s.id,
                 onEdit = { nav.go(Screen.Details(s.id)) },
+                onEditPost = { card ->
+                    editor.loadForCard(card)
+                    nav.go(Screen.Editor)
+                },
                 onBack = nav::back,
             )
             Screen.Settings -> SettingsScreen(onBack = nav::back)

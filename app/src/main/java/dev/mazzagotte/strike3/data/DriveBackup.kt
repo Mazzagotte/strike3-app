@@ -102,6 +102,7 @@ object DriveBackup {
                     put("postUri", card.postUri ?: JSONObject.NULL)
                     put("originalUri", card.originalUri ?: JSONObject.NULL)
                     put("createdAt", card.createdAt)
+                    put("editParams", card.editParams ?: JSONObject.NULL)
                 })
             }
         })
@@ -125,6 +126,7 @@ object DriveBackup {
         postUri = if (o.isNull("postUri")) null else o.optString("postUri"),
         originalUri = if (o.isNull("originalUri")) null else o.optString("originalUri"),
         createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+        editParams = if (o.isNull("editParams")) null else o.optString("editParams"),
     )
 
     private fun toCsv(cards: List<Card>): String {

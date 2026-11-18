@@ -12,6 +12,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "cards")
@@ -35,6 +37,14 @@ data class Card(
     /** Original photo of the card */
     val originalUri: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    /** Editor settings (JSON) so the post can be re-edited later */
+    val editParams: String? = null,
+    /** App-private copies used for re-editing and exports */
+    val sourcePath: String? = null,
+    val cutoutPath: String? = null,
+    /** Carousel slide 2 photos (app-private) */
+    val backPath: String? = null,
+    val closeUpPath: String? = null,
 ) {
     val title: String
         get() = player.ifBlank { "Untitled card" }
@@ -70,12 +80,22 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 1, exportSchema = false)
+@Database(entities = [Card::class], version = 2, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("editParams", "sourcePath", "cutoutPath", "backPath", "closeUpPath").forEach {
+                    db.execSQL("ALTER TABLE cards ADD COLUMN $it TEXT")
+                }
+            }
+        }
+
         fun create(context: Context): AppDb =
-            Room.databaseBuilder(context, AppDb::class.java, "strike3.db").build()
+            Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }

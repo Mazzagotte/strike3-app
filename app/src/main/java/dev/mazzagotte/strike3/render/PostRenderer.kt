@@ -48,13 +48,20 @@ class PostRenderer(context: Context) {
     private fun grad(x0: Float, y0: Float, x1: Float, y1: Float, gold: Boolean) =
         LinearGradient(x0, y0, x1, y1, if (gold) GLD else SIL, STOPS, Shader.TileMode.CLAMP)
 
-    /** Everything except the card photo. Cache this per tag text. */
-    fun background(tag: String): Bitmap {
-        val bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888)
+    /**
+     * Everything except the card photo. Cache this per tag text.
+     * [height] 1350 = feed post (4:5), 1920 = Story / Reel cover (9:16). The 4:5 layout is centered
+     * vertically on taller canvases so it sits clear of Instagram's Story controls.
+     */
+    fun background(tag: String, height: Int = H): Bitmap {
+        val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
+        val offY = (height - H) / 2f
         c.drawColor(0xFF0B0C0E.toInt())
 
-        // Spotlight behind the card
+        // Spotlight behind the card, and the big faint III
+        c.save()
+        c.translate(0f, offY)
         val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = RadialGradient(
                 540f, 594f, 760f,
@@ -66,15 +73,18 @@ class PostRenderer(context: Context) {
         c.scale(620f / 760f, 1f, 540f, 594f)
         c.drawRect(-900f, -400f, 2000f, 1800f, spot)
         c.restore()
-
-        // Big faint III cropped off the top-left
         drawBars(c, -160f, -150f, 980f, 0.07f)
+        c.restore()
 
-        // Floor and its edge
+        // Floor runs to the bottom of the canvas
+        val floorTop = FLOOR + offY
         val floor = Paint().apply {
-            shader = LinearGradient(0f, FLOOR, 0f, H.toFloat(), 0xFF17191C.toInt(), 0xFF08090A.toInt(), Shader.TileMode.CLAMP)
+            shader = LinearGradient(0f, floorTop, 0f, height.toFloat(), 0xFF17191C.toInt(), 0xFF08090A.toInt(), Shader.TileMode.CLAMP)
         }
-        c.drawRect(0f, FLOOR, W.toFloat(), H.toFloat(), floor)
+        c.drawRect(0f, floorTop, W.toFloat(), height.toFloat(), floor)
+
+        c.save()
+        c.translate(0f, offY)
         val edge = Paint().apply {
             shader = LinearGradient(
                 140f, 0f, 940f, 0f,
@@ -82,9 +92,9 @@ class PostRenderer(context: Context) {
             )
         }
         c.drawRect(140f, FLOOR - 1f, 940f, FLOOR + 1f, edge)
-
         drawTag(c, tag.trim().uppercase())
         drawWordmark(c)
+        c.restore()
         return bmp
     }
 
@@ -101,6 +111,7 @@ class PostRenderer(context: Context) {
         if (photo == null) return out
         val c = Canvas(out)
         val r = photoRect(photo.width, photo.height, mode, placement)
+        r.offset(0f, (background.height - H) / 2f)
 
         if (reflect) {
             val rh = min(r.height() * 0.32f, 260f)
@@ -122,6 +133,62 @@ class PostRenderer(context: Context) {
         if (mode == PhotoMode.BLACK && lighten) p.xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
         c.drawBitmap(photo, null, r, p)
         return out
+    }
+
+    /** Carousel slide 2: card back and serial close-up side by side, shot on black. */
+    fun slide2(background: Bitmap, back: Bitmap?, closeUp: Bitmap?): Bitmap {
+        val out = background.copy(Bitmap.Config.ARGB_8888, true)
+        val c = Canvas(out)
+        val offY = (background.height - H) / 2f
+        val p = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
+        }
+        val boxes = listOfNotNull(back, closeUp)
+        if (boxes.size == 1) {
+            c.drawBitmap(boxes[0], null, fit(boxes[0], RectF(160f, 190f + offY, 920f, 1000f + offY)), p)
+        } else if (boxes.size == 2) {
+            c.drawBitmap(boxes[0], null, fit(boxes[0], RectF(60f, 230f + offY, 525f, 990f + offY)), p)
+            c.drawBitmap(boxes[1], null, fit(boxes[1], RectF(555f, 230f + offY, 1020f, 990f + offY)), p)
+        }
+        return out
+    }
+
+    /** Plain white 1600 x 1600 photo for selling or trading listings. */
+    fun listing(photo: Bitmap, cutout: Boolean): Bitmap {
+        val size = 1600
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        c.drawColor(0xFFFFFFFF.toInt())
+        val r = fit(photo, RectF(160f, 90f, 1440f, 1450f))
+        if (cutout) {
+            // Soft contact shadow under the card
+            val sh = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(0f, 0f, 1f, intArrayOf(0x33000000, 0x00000000), floatArrayOf(0f, 1f), Shader.TileMode.CLAMP)
+            }
+            c.save()
+            c.translate(r.centerX(), r.bottom)
+            c.scale(r.width() * 0.6f, 34f)
+            c.drawCircle(0f, 0f, 1f, sh)
+            c.restore()
+        }
+        c.drawBitmap(photo, null, r, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = display
+            textSize = 30f
+            letterSpacing = 0.35f
+            color = 0xFFA0A4AA.toInt()
+            textAlign = Paint.Align.CENTER
+        }
+        c.drawText("STRIKE III CARDS", size / 2f, 1545f, tp)
+        return out
+    }
+
+    /** Largest rect with the bitmap's shape that fits inside [box], centered. */
+    private fun fit(bmp: Bitmap, box: RectF): RectF {
+        val s = min(box.width() / bmp.width, box.height() / bmp.height)
+        val w = bmp.width * s; val h = bmp.height * s
+        val x = box.centerX() - w / 2f; val y = box.centerY() - h / 2f
+        return RectF(x, y, x + w, y + h)
     }
 
     /** Cutouts stand on the floor; photos shot on black sit centered in the spotlight. */

@@ -36,6 +36,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,14 +58,35 @@ private val TAGS = listOf("" to "Base", "NEW PICKUP" to "New pickup", "PC FAVORI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onBack: () -> Unit) {
+fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Unit, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    val editing = vm.editingCard != null
+    val ready = vm.source != null && vm.busy == null && !saving
+    val primary: () -> Unit = {
+        if (editing) {
+            saving = true
+            scope.launch {
+                try {
+                    vm.saveEdit()
+                    onSavedEdit()
+                } catch (e: Exception) {
+                    vm.message = "Couldn't save: ${e.message}"
+                } finally {
+                    saving = false
+                }
+            }
+        } else {
+            onNext()
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Make the post") },
+                title = { Text(if (editing) "Edit post" else "Make the post") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    TextButton(onClick = onNext, enabled = vm.source != null && vm.busy == null) { Text("Next") }
+                    TextButton(onClick = primary, enabled = ready) { Text(if (editing) "Save" else "Next") }
                 },
             )
         },
@@ -119,10 +146,10 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onBack: () -> Unit) {
             }
 
             Button(
-                onClick = onNext,
-                enabled = vm.source != null && vm.busy == null,
+                onClick = primary,
+                enabled = ready,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            ) { Text("Next: card details") }
+            ) { Text(if (saving) "Saving…" else if (editing) "Save post" else "Next: card details") }
         }
     }
 

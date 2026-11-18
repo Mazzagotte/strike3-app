@@ -1,6 +1,9 @@
 package dev.mazzagotte.strike3.ui
 
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +16,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -37,6 +42,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.Card
+import dev.mazzagotte.strike3.render.PhotoTools
+import dev.mazzagotte.strike3.render.SourceStore
+import dev.mazzagotte.strike3.util.CardReader
 import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,6 +61,38 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     var loaded by remember { mutableStateOf(editId == null) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    var scanning by remember { mutableStateOf<String?>(null) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var chooseScanSource by remember { mutableStateOf(false) }
+
+    fun readCard(uri: Uri) {
+        scope.launch {
+            scanning = "Reading the card…"
+            try {
+                val bmp = withContext(Dispatchers.IO) { PhotoTools.decode(context, uri) }
+                val guess = CardReader.read(bmp)
+                // Keep the photo as the carousel's back slide
+                val back = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, "back-" + Media.stamp()) }
+                card = CardReader.merge(card, guess).copy(backPath = card.backPath ?: back)
+                scanning = if (guess.found.isEmpty()) "Couldn't read any details. Try a sharper, closer photo of the back."
+                else "Filled in: " + guess.found.joinToString(", ") + ". Check them before saving."
+            } catch (e: Exception) {
+                scanning = "Couldn't read the card: ${e.message}"
+            }
+        }
+    }
+
+    val takeScan = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val uri = pendingCameraUri
+        pendingCameraUri = null
+        if (uri != null) {
+            if (ok) readCard(uri) else Media.delete(context, uri)
+        }
+    }
+    val pickScan = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) readCard(uri)
+    }
 
     LaunchedEffect(editId) {
         if (editId != null) {
@@ -74,10 +114,14 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                     val post = editor.renderFinal()
                     val name = "strike3-" + (card.player.filter { it.isLetterOrDigit() }.ifBlank { "card" }) + "-" + Media.stamp()
                     val uri: Uri = withContext(Dispatchers.IO) { Media.saveJpeg(context, post, name) }
+                    val (sourcePath, cutoutPath) = editor.saveSources(name)
                     val saved = card.copy(
                         postUri = uri.toString(),
                         originalUri = editor.originalUri?.toString(),
                         posted = card.posted || share,
+                        editParams = editor.currentEditParams().toJson(),
+                        sourcePath = sourcePath,
+                        cutoutPath = cutoutPath,
                     )
                     val id = repo.add(saved)
                     if (share) Media.shareToInstagram(context, uri, Media.caption(saved))
@@ -103,6 +147,13 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            OutlinedButton(onClick = { chooseScanSource = true }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.DocumentScanner, contentDescription = null)
+                Text("  Read details from the card back")
+            }
+            scanning?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Field("Player", card.player, words = true) { card = card.copy(player = it) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field("Year", card.year, number = true, modifier = Modifier.weight(0.35f)) { card = card.copy(year = it) }
@@ -125,7 +176,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             Field("Notes", card.notes, singleLine = false) { card = card.copy(notes = it) }
             LabeledSwitch("Posted to Instagram", card.posted) { card = card.copy(posted = it) }
 
-            error?.let { Text(it, color = androidx.compose.material3.MaterialTheme.colorScheme.error) }
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
             if (editId == null) {
                 Button(onClick = { save(share = true) }, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
@@ -140,6 +191,23 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 }
             }
         }
+    }
+    if (chooseScanSource) {
+        PhotoSourceDialog(
+            title = "Photo of the card back",
+            onCamera = {
+                chooseScanSource = false
+                Media.newCameraUri(context)?.let { uri ->
+                    pendingCameraUri = uri
+                    takeScan.launch(uri)
+                }
+            },
+            onGallery = {
+                chooseScanSource = false
+                pickScan.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onDismiss = { chooseScanSource = false },
+        )
     }
 }
 

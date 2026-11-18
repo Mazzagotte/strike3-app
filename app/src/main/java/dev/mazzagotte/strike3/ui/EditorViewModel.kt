@@ -10,10 +10,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.mazzagotte.strike3.Strike3App
+import dev.mazzagotte.strike3.data.Card
+import dev.mazzagotte.strike3.render.EditParams
 import dev.mazzagotte.strike3.render.PhotoMode
 import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.Placement
 import dev.mazzagotte.strike3.render.PostRenderer
+import dev.mazzagotte.strike3.render.SourceStore
+import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -27,7 +32,12 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var originalUri: Uri? = null
         private set
-    private var cutoutBitmap by mutableStateOf<Bitmap?>(null)
+    var cutoutBitmap by mutableStateOf<Bitmap?>(null)
+        private set
+
+    /** Set when re-editing a saved card's post instead of making a new one. */
+    var editingCard by mutableStateOf<Card?>(null)
+        private set
 
     var mode by mutableStateOf(PhotoMode.BLACK)
         private set
@@ -93,6 +103,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun load(uri: Uri) {
+        editingCard = null
         source = null
         cutoutBitmap = null
         originalUri = uri
@@ -149,6 +160,81 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
                 busy = null
             }
         }
+    }
+
+    /** Opens a saved card's post with the settings it was saved with. */
+    fun loadForCard(card: Card) {
+        editingCard = card
+        source = null
+        cutoutBitmap = null
+        originalUri = card.originalUri?.let(Uri::parse)
+        preparedCache = null
+        val p = EditParams.fromJson(card.editParams)
+        val preset = listOf("", "NEW PICKUP", "PC FAVORITE")
+        if (p.tag in preset) { tag = p.tag; customTag = "" } else { tag = ""; customTag = p.tag }
+        feather = p.feather
+        brightness = p.brightness
+        lighten = p.lighten
+        reflect = p.reflect
+        placement = p.placement
+        mode = PhotoMode.BLACK
+        viewModelScope.launch {
+            busy = "Loading photo…"
+            try {
+                val app = getApplication<Application>()
+                val src = withContext(Dispatchers.IO) {
+                    SourceStore.load(card.sourcePath)
+                        ?: card.originalUri?.let { PhotoTools.decode(app, Uri.parse(it)) }
+                } ?: error("the original photo isn't saved in the app")
+                val cut = withContext(Dispatchers.IO) { SourceStore.load(card.cutoutPath) }
+                source = src
+                cutoutBitmap = cut
+                if (p.mode == PhotoMode.CUTOUT) {
+                    if (cut == null) cutoutBitmap = PhotoTools.cutout(src)
+                    mode = PhotoMode.CUTOUT
+                }
+                reflect = p.reflect
+                placement = p.placement
+            } catch (e: Exception) {
+                message = "Couldn't open this post for editing: ${e.message}"
+            } finally {
+                busy = null
+            }
+        }
+    }
+
+    fun currentEditParams() = EditParams(
+        mode = mode, tag = tagText, feather = feather, brightness = brightness,
+        lighten = lighten, reflect = reflect, placement = placement,
+    )
+
+    /** Saves the source photo (and cutout) privately so the post can be re-edited later. */
+    suspend fun saveSources(name: String): Pair<String?, String?> = withContext(Dispatchers.IO) {
+        val app = getApplication<Application>()
+        val src = source?.let { SourceStore.save(app, it, name) }
+        val cut = cutoutBitmap?.let { SourceStore.save(app, it, "$name-cutout", png = true) }
+        src to cut
+    }
+
+    /** Re-edit: renders the new post, replaces the old image, and updates the card. */
+    suspend fun saveEdit(): Card {
+        val card = editingCard ?: error("Nothing to save")
+        val app = getApplication<Application>()
+        val post = renderFinal()
+        val name = "strike3-" + card.player.filter { it.isLetterOrDigit() }.ifBlank { "card" } + "-" + Media.stamp()
+        val uri = withContext(Dispatchers.IO) { Media.saveJpeg(app, post, name) }
+        card.postUri?.let { old -> withContext(Dispatchers.IO) { Media.delete(app, Uri.parse(old)) } }
+        val sourcePath = card.sourcePath ?: source?.let { withContext(Dispatchers.IO) { SourceStore.save(app, it, name) } }
+        val cutoutPath = card.cutoutPath ?: cutoutBitmap?.let { withContext(Dispatchers.IO) { SourceStore.save(app, it, "$name-cutout", png = true) } }
+        val updated = card.copy(
+            postUri = uri.toString(),
+            editParams = currentEditParams().toJson(),
+            sourcePath = sourcePath,
+            cutoutPath = cutoutPath,
+        )
+        (app as Strike3App).repo.update(updated)
+        editingCard = null
+        return updated
     }
 
     fun selectTag(t: String) {

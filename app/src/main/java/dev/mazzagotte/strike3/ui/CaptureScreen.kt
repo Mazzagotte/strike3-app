@@ -8,7 +8,9 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -18,6 +20,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +42,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,6 +65,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mazzagotte.strike3.util.Media
+import kotlinx.coroutines.delay
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun CaptureScreen(onPhoto: (Uri) -> Unit, onBack: () -> Unit) {
@@ -118,6 +125,14 @@ private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var focusAt by remember { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(focusAt) {
+        if (focusAt != null) {
+            delay(1200)
+            focusAt = null
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -126,7 +141,7 @@ private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
             val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
             provider.unbindAll()
             try {
-                provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                camera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
             } catch (e: Exception) {
                 error = "Camera unavailable: ${e.message}"
             }
@@ -136,16 +151,33 @@ private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            // Tap to focus (and set exposure) on that spot
+            detectTapGestures { pos ->
+                val point = previewView.meteringPointFactory.createPoint(pos.x, pos.y)
+                val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                    .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                    .build()
+                camera?.cameraControl?.startFocusAndMetering(action)
+                focusAt = pos
+            }
+        },
+    ) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
         CardGuide()
+        focusAt?.let { pos ->
+            Canvas(Modifier.fillMaxSize()) {
+                drawCircle(Color.White, radius = 34.dp.toPx(), center = pos, style = Stroke(width = 2.dp.toPx()))
+            }
+        }
 
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().systemBarsPadding().padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                error ?: "Line the card up inside the frame. Black backdrop, flash off.",
+                error ?: "Line the card up inside the frame. Tap to focus.",
                 color = Color.White, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
             )

@@ -12,13 +12,25 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Drag and pinch to place the card, plus sliders for size, edge fade and brightness
 - Saves a 1080×1350 JPG and opens Instagram's share options with the caption already copied
 
+**On each saved card**
+- **Edit post:** reopen the post with its saved settings and change the tag, position or look without reshooting
+- **Share as Story or Reel cover:** the same post at 1080×1920 (9:16)
+- **Carousel:** add a photo of the back and a close-up; slide 2 shows them side by side, and both slides share to Instagram together
+- **Listing photo:** plain white 1600×1600 photo for selling or trading, saved to `Pictures/Strike III Listings`
+
+**Read details from the card back**
+- On the details screen, take or pick a photo of the back. On-device text recognition fills in the player, year, set, serial, team, auto and rookie when it finds them. Only empty fields are filled, and the photo becomes the carousel's back slide.
+
+**Camera**
+- Tap anywhere on the preview to focus and set exposure there.
+
 **Collection log**
 - Player, year, set, parallel, serial, team, auto/rookie/patch, date acquired, price paid, posted, notes
 - Search, plus filters for autos, rookies and not posted
 - Ready-made captions with hashtags
 
 **Backup**
-- Card log → Google Drive. Settings › Set up Drive backup creates `strike3-backup.json` (restore file) and `strike3-collection.csv` (opens in Google Sheets). Both are rewritten after every change.
+- Card log → Google Drive (details and post settings; the private photo copies used for re-editing stay on the phone). Settings › Set up Drive backup creates `strike3-backup.json` (restore file) and `strike3-collection.csv` (opens in Google Sheets). Both are rewritten after every change.
 - Photos → Google Photos. Posts go to `Pictures/Strike III`, originals to `Pictures/Strike III Originals`. Turn on backup for both folders in Google Photos.
 
 ## Getting the APK
