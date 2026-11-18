@@ -44,13 +44,10 @@ All builds are signed with the same key (`keystore/strike3-debug.jks`), so new v
 
 You can also open the project in Android Studio and run it directly.
 
-## Optional: brand fonts
+## Fonts
 
-The template uses the phone's condensed font unless these files are added to `app/src/main/res/font/`:
-- `bebas_neue.ttf` (Bebas Neue, for STRIKE III CARDS)
-- `oswald_medium.ttf` (Oswald Medium, for tags and the K)
-
-Both are free on Google Fonts. File names must be exactly as above.
+The template uses Bebas Neue (STRIKE III CARDS) and Oswald Medium (tags and the K), bundled in
+`app/src/main/res/font/`. Both are free fonts under the SIL Open Font License (see `licenses/`).
 
 ## Notes
 
