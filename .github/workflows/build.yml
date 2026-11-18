@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,3 +30,15 @@ jobs:
         with:
           name: strike3-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # A Release per build, so the newest APK is always at /releases/latest (easy to grab on the phone)
+      - name: Name the APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk strike3.apk
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Strike III build ${{ github.run_number }}
+          body: Tap strike3.apk below to download, then open it to install.
+          files: strike3.apk
+          make_latest: true
