@@ -26,9 +26,9 @@ class PostComposer(private val context: Context) {
         } else {
             source(card)
         }
-        val photo = found ?: throw MissingPhoto()
+        val photo = PhotoTools.rotate(found ?: throw MissingPhoto(), p.rotation)
         val featherPx = if (p.mode == PhotoMode.BLACK) PhotoTools.fadePx(p.feather, photo.width) else 0f
-        val prepared = PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance)
+        val prepared = PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance, p.sharpen)
         renderer.compose(renderer.background(p.tag, height, p.badges), prepared, p.mode, p.lighten, p.reflect, p.placement)
     }
 
@@ -43,18 +43,19 @@ class PostComposer(private val context: Context) {
     // Back / close-up photos: trim the background, then fade the thin margin and enhance
     private fun blend(b: Bitmap): Bitmap {
         val t = PhotoTools.autoTrim(b)
-        return PhotoTools.prepare(t, 1f, PhotoTools.fadePx(100f, t.width), enhance = true)
+        return PhotoTools.prepare(t, 1f, PhotoTools.fadePx(100f, t.width), enhance = true, sharpen = true)
     }
 
     /** White-background listing photo. Uses the cutout, making one if needed. */
     suspend fun listing(card: Card): Bitmap = withContext(Dispatchers.Default) {
         val cut = SourceStore.load(card.cutoutPath)
             ?: source(card)?.let { src -> runCatching { PhotoTools.cutout(src) }.getOrNull() }
+        val turn = EditParams.fromJson(card.editParams).rotation
         if (cut != null) {
-            renderer.listing(cut, cutout = true)
+            renderer.listing(PhotoTools.rotate(cut, turn), cutout = true)
         } else {
             val src = source(card) ?: throw MissingPhoto()
-            renderer.listing(src, cutout = false)
+            renderer.listing(PhotoTools.rotate(src, turn), cutout = false)
         }
     }
 }

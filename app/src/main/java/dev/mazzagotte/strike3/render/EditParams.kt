@@ -13,6 +13,9 @@ data class EditParams(
     val tag: String = "",
     val feather: Float = 100f,
     val enhance: Boolean = true,
+    val sharpen: Boolean = true,
+    /** Clockwise turn applied to the photo: 0, 90, 180 or 270 */
+    val rotation: Int = 0,
     val brightness: Float = 1f,
     val lighten: Boolean = true,
     val reflect: Boolean = false,
@@ -25,6 +28,8 @@ data class EditParams(
         put("tag", tag)
         put("feather", feather.toDouble())
         put("enhance", enhance)
+        put("sharpen", sharpen)
+        put("rotation", rotation)
         put("brightness", brightness.toDouble())
         put("lighten", lighten)
         put("reflect", reflect)
@@ -44,6 +49,8 @@ data class EditParams(
                     tag = o.optString("tag"),
                     feather = o.optDouble("feather", 100.0).toFloat(),
                     enhance = o.optBoolean("enhance", true),
+                    sharpen = o.optBoolean("sharpen", false),
+                    rotation = o.optInt("rotation", 0),
                     brightness = o.optDouble("brightness", 1.0).toFloat(),
                     lighten = o.optBoolean("lighten", true),
                     reflect = o.optBoolean("reflect", false),

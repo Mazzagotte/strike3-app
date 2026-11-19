@@ -7,6 +7,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.ImageDecoder
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
@@ -221,8 +222,65 @@ object PhotoTools {
         return m
     }
 
-    /** Auto enhance, brightness and (for photos shot on black) soft faded edges. */
-    fun prepare(src: Bitmap, brightness: Float, featherPx: Float, enhance: Boolean = false): Bitmap {
+    /** Turns the photo clockwise by 0, 90, 180 or 270 degrees. */
+    fun rotate(bmp: Bitmap, degrees: Int): Bitmap {
+        val d = ((degrees % 360) + 360) % 360
+        if (d == 0) return bmp
+        val m = Matrix().apply { postRotate(d.toFloat()) }
+        return Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+    }
+
+    /**
+     * Light unsharp mask: adds back the difference between the photo and a slightly blurred copy,
+     * which crisps up printed text, jersey stripes and card edges. Tiny differences (sensor noise)
+     * are left alone so smooth areas and glare don't turn gritty. Transparency is kept.
+     */
+    fun sharpen(src: Bitmap, amount: Float = 0.55f, radius: Int = 2, threshold: Int = 4): Bitmap {
+        val w = src.width; val h = src.height
+        val px = IntArray(w * h)
+        src.getPixels(px, 0, w, 0, 0, w, h)
+        val blur = boxBlur(boxBlur(px, w, h, radius, horizontal = true), w, h, radius, horizontal = false)
+        val out = IntArray(w * h)
+        for (i in px.indices) {
+            val c = px[i]; val b = blur[i]
+            val a = c ushr 24
+            fun ch(shift: Int): Int {
+                val o = (c shr shift) and 0xFF
+                val d = o - ((b shr shift) and 0xFF)
+                return if (abs(d) < threshold) o else (o + amount * d).roundToInt().coerceIn(0, 255)
+            }
+            out[i] = (a shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+        }
+        return Bitmap.createBitmap(out, w, h, Bitmap.Config.ARGB_8888)
+    }
+
+    /** One pass of a box blur (run horizontally, then vertically). */
+    private fun boxBlur(src: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean): IntArray {
+        val out = IntArray(src.size)
+        val lines = if (horizontal) h else w
+        val len = if (horizontal) w else h
+        for (line in 0 until lines) {
+            var sr = 0; var sg = 0; var sb = 0
+            fun idx(i: Int): Int {
+                val j = i.coerceIn(0, len - 1)
+                return if (horizontal) line * w + j else j * w + line
+            }
+            for (i in -r..r) { val c = src[idx(i)]; sr += (c shr 16) and 0xFF; sg += (c shr 8) and 0xFF; sb += c and 0xFF }
+            val n = 2 * r + 1
+            for (i in 0 until len) {
+                out[idx(i)] = (0xFF shl 24) or ((sr / n) shl 16) or ((sg / n) shl 8) or (sb / n)
+                val add = src[idx(i + r + 1)]; val rem = src[idx(i - r)]
+                sr += ((add shr 16) and 0xFF) - ((rem shr 16) and 0xFF)
+                sg += ((add shr 8) and 0xFF) - ((rem shr 8) and 0xFF)
+                sb += (add and 0xFF) - (rem and 0xFF)
+            }
+        }
+        return out
+    }
+
+    /** Sharpen, auto enhance, brightness and (for photos shot on black) soft faded edges. */
+    fun prepare(src0: Bitmap, brightness: Float, featherPx: Float, enhance: Boolean = false, sharpen: Boolean = false): Bitmap {
+        val src = if (sharpen) sharpen(src0) else src0
         val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         val p = Paint(Paint.FILTER_BITMAP_FLAG)

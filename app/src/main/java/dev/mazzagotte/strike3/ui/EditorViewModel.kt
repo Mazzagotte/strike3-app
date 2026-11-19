@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -19,6 +20,7 @@ import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.Placement
 import dev.mazzagotte.strike3.render.PostRenderer
 import dev.mazzagotte.strike3.render.SourceStore
+import dev.mazzagotte.strike3.util.CardReader
 import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -47,6 +49,11 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     var customTag by mutableStateOf("")
     var feather by mutableFloatStateOf(100f)
     var enhance by mutableStateOf(true)
+    var sharpen by mutableStateOf(true)
+    /** Clockwise turn of the photo: 0, 90, 180, 270 */
+    var rotation by mutableIntStateOf(0)
+    /** Short note under the preview, e.g. after auto-rotate */
+    var note by mutableStateOf<String?>(null)
     var brightness by mutableFloatStateOf(1f)
     var lighten by mutableStateOf(true)
     var reflect by mutableStateOf(false)
@@ -77,6 +84,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     private data class Params(
         val photo: Bitmap?, val mode: PhotoMode, val tag: String, val feather: Float, val enhance: Boolean,
+        val sharpen: Boolean, val rotation: Int,
         val brightness: Float, val lighten: Boolean, val reflect: Boolean, val placement: Placement,
         val badges: List<String>,
     )
@@ -95,8 +103,8 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun currentParams() = Params(
         photo = if (mode == PhotoMode.CUTOUT) cutoutBitmap ?: source else source,
-        mode = mode, tag = tagText, feather = feather, enhance = enhance, brightness = brightness,
-        lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
+        mode = mode, tag = tagText, feather = feather, enhance = enhance, sharpen = sharpen, rotation = rotation,
+        brightness = brightness, lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
     private fun background(tag: String, badges: List<String>): Bitmap {
@@ -105,12 +113,17 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         return renderer.background(tag, PostRenderer.H, badges).also { bgCache = key to it }
     }
 
+    private var rotatedCache: Pair<List<Any>, Bitmap>? = null
+
     private fun prepared(p: Params): Bitmap? {
-        val photo = p.photo ?: return null
+        val base = p.photo ?: return null
+        val rkey = listOf(System.identityHashCode(base), p.rotation)
+        val photo = rotatedCache?.takeIf { it.first == rkey }?.second
+            ?: PhotoTools.rotate(base, p.rotation).also { rotatedCache = rkey to it }
         val featherPx = if (p.mode == PhotoMode.BLACK) PhotoTools.fadePx(p.feather, photo.width) else 0f
-        val key = listOf(System.identityHashCode(photo), p.mode, featherPx, p.brightness, p.enhance)
+        val key = listOf(System.identityHashCode(photo), p.mode, featherPx, p.brightness, p.enhance, p.sharpen)
         preparedCache?.let { if (it.first == key) return it.second }
-        return PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance).also { preparedCache = key to it }
+        return PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance, p.sharpen).also { preparedCache = key to it }
     }
 
     private fun render(p: Params): Bitmap =
@@ -130,6 +143,9 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         feather = 100f
         brightness = 1f
         enhance = true
+        sharpen = true
+        rotation = 0
+        note = null
         source = null
         cutoutBitmap = null
         originalUri = uri
@@ -152,6 +168,13 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 source = bmp
+                // Auto-rotate so the card's printed text reads upright
+                busy = "Checking which way is up…"
+                val turn = try { CardReader.detectRotation(bmp) } catch (_: Exception) { 0 }
+                if (turn != 0) {
+                    rotation = turn
+                    note = (if (turn == 180) "Flipped right side up" else if (turn == 90) "Turned right" else "Turned left") + " so the card reads upright. Use the rotate buttons if that's wrong."
+                }
                 if (transparent) {
                     // Already a cutout (e.g. Samsung "Save as image")
                     cutoutBitmap = withContext(Dispatchers.Default) { PhotoTools.cropToContent(bmp) }
@@ -208,6 +231,9 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         if (p.tag in preset) { tag = p.tag; customTag = "" } else { tag = ""; customTag = p.tag }
         feather = p.feather
         enhance = p.enhance
+        sharpen = p.sharpen
+        rotation = p.rotation
+        note = null
         brightness = p.brightness
         lighten = p.lighten
         reflect = p.reflect
@@ -241,8 +267,8 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun currentEditParams() = EditParams(
-        mode = mode, tag = tagText, feather = feather, enhance = enhance, brightness = brightness,
-        lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
+        mode = mode, tag = tagText, feather = feather, enhance = enhance, sharpen = sharpen, rotation = rotation,
+        brightness = brightness, lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
     /** Saves the source photo (and cutout) privately so the post can be re-edited later. */
@@ -284,4 +310,11 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun resetPosition() { placement = Placement() }
+
+    /** Turn the photo 90° clockwise (+90) or counter-clockwise (-90). */
+    fun rotateBy(deg: Int) {
+        rotation = ((rotation + deg) % 360 + 360) % 360
+        placement = Placement()
+        note = null
+    }
 }

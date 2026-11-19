@@ -6,6 +6,10 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import dev.mazzagotte.strike3.data.Card
 import kotlinx.coroutines.tasks.await
+import kotlin.math.atan2
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Reads the text on a card (usually the back) with Google's on-device text recognition
@@ -40,6 +44,40 @@ object CardReader {
             val text = client.process(InputImage.fromBitmap(bmp, 0)).await()
             val lines = text.textBlocks.flatMap { b -> b.lines.map { it.text.trim() } }.filter { it.isNotBlank() }
             return parse(lines)
+        } finally {
+            client.close()
+        }
+    }
+
+    /**
+     * Auto-rotate: finds which way the printed text on the card runs and returns the clockwise turn
+     * (0, 90, 180, 270) that makes most of it read upright. Each line of text votes, weighted by how
+     * many letters it has. Returns 0 when there isn't enough readable text to be sure.
+     */
+    suspend fun detectRotation(bmp: Bitmap): Int {
+        val k = min(1f, 1600f / max(bmp.width, bmp.height))
+        val img = if (k < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt(), (bmp.height * k).toInt(), true) else bmp
+        val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        try {
+            val text = client.process(InputImage.fromBitmap(img, 0)).await()
+            val votes = IntArray(4)
+            var letters = 0
+            for (block in text.textBlocks) for (line in block.lines) {
+                val pts = line.cornerPoints ?: continue
+                if (pts.size < 2) continue
+                val weight = line.text.count { it.isLetter() }
+                if (weight < 2) continue
+                // Corner 0 → corner 1 runs along the line in reading order
+                val angle = Math.toDegrees(atan2((pts[1].y - pts[0].y).toDouble(), (pts[1].x - pts[0].x).toDouble()))
+                val quarter = (((angle / 90.0).roundToInt() % 4) + 4) % 4 // 0 = upright, 1 = runs downward, ...
+                votes[quarter] += weight
+                letters += weight
+            }
+            if (letters < 6) return 0
+            val best = votes.indices.maxByOrNull { votes[it] } ?: 0
+            if (votes[best] < letters * 0.5f) return 0 // mixed directions: don't guess
+            // Text running at +90° (downward) needs a 270° clockwise turn, and so on
+            return (360 - best * 90) % 360
         } finally {
             client.close()
         }

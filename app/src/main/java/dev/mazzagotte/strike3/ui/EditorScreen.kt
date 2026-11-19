@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Rotate90DegreesCcw
+import androidx.compose.material.icons.filled.Rotate90DegreesCw
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -98,6 +100,20 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
         ) {
             PostPreview(vm)
 
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { vm.rotateBy(-90) }, enabled = vm.source != null) {
+                    Icon(Icons.Filled.Rotate90DegreesCcw, contentDescription = null)
+                    Text("  Rotate left")
+                }
+                OutlinedButton(onClick = { vm.rotateBy(90) }, enabled = vm.source != null) {
+                    Icon(Icons.Filled.Rotate90DegreesCw, contentDescription = null)
+                    Text("  Rotate right")
+                }
+            }
+            vm.note?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             Section("Photo type") {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     SegmentedButton(
@@ -159,6 +175,7 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
                     LabeledSlider("Edge fade", vm.feather, 0f..200f) { vm.feather = it }
                 }
                 LabeledSwitch("Auto enhance", vm.enhance) { vm.enhance = it }
+                LabeledSwitch("Sharpen", vm.sharpen) { vm.sharpen = it }
                 LabeledSlider("Brightness", vm.brightness, 0.7f..1.4f) { vm.brightness = it }
                 if (vm.mode == PhotoMode.BLACK) {
                     LabeledSwitch("Hide black backdrop", vm.lighten) { vm.lighten = it }
