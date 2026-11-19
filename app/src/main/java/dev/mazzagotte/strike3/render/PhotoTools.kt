@@ -172,14 +172,63 @@ object PhotoTools {
         return Bitmap.createBitmap(bmp, l, t, rr - l, bbm - t)
     }
 
-    /** Brightness and (for photos shot on black) soft faded edges. */
-    fun prepare(src: Bitmap, brightness: Float, featherPx: Float): Bitmap {
+    /**
+     * Edge fade in pixels. [amount] is the Edge fade slider (100 = default). At 100 the fade is 4% of the
+     * photo's width: about the margin the crop/trim leaves around the holder, so the card itself never fades.
+     */
+    fun fadePx(amount: Float, width: Int): Float = (amount / 100f) * 0.04f * width
+
+    /**
+     * Auto enhance: stretches the darkest and brightest 1% to full black and white (capped so it never
+     * overdoes it), then adds a little contrast and color so the card pops on the dark background.
+     */
+    private fun enhanceMatrix(src: Bitmap): ColorMatrix {
+        val k = 200f / max(src.width, src.height)
+        val small = Bitmap.createScaledBitmap(src, max(4, (src.width * k).roundToInt()), max(4, (src.height * k).roundToInt()), true)
+        val px = IntArray(small.width * small.height)
+        small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
+        val hist = IntArray(256)
+        var n = 0
+        for (c in px) {
+            if ((c ushr 24) < 128) continue // ignore transparent (cutout) pixels
+            val l = (0.299f * ((c shr 16) and 0xFF) + 0.587f * ((c shr 8) and 0xFF) + 0.114f * (c and 0xFF)).roundToInt()
+            hist[l.coerceIn(0, 255)]++
+            n++
+        }
+        val m = ColorMatrix()
+        if (n > 0) {
+            var acc = 0; var lo = 0
+            while (lo < 255 && acc + hist[lo] < n * 0.01f) { acc += hist[lo]; lo++ }
+            acc = 0; var hi = 255
+            while (hi > 0 && acc + hist[hi] < n * 0.01f) { acc += hist[hi]; hi-- }
+            val low = lo.coerceAtMost(40).toFloat()
+            val high = hi.coerceAtLeast(190).toFloat()
+            val scale = (255f / max(1f, high - low)).coerceAtMost(1.6f)
+            m.set(
+                floatArrayOf(
+                    scale, 0f, 0f, 0f, -low * scale,
+                    0f, scale, 0f, 0f, -low * scale,
+                    0f, 0f, scale, 0f, -low * scale,
+                    0f, 0f, 0f, 1f, 0f,
+                ),
+            )
+        }
+        // A touch more contrast (around mid-grey) and color
+        val contrast = 1.08f
+        val t = 128f * (1f - contrast)
+        m.postConcat(ColorMatrix(floatArrayOf(contrast, 0f, 0f, 0f, t, 0f, contrast, 0f, 0f, t, 0f, 0f, contrast, 0f, t, 0f, 0f, 0f, 1f, 0f)))
+        m.postConcat(ColorMatrix().apply { setSaturation(1.15f) })
+        return m
+    }
+
+    /** Auto enhance, brightness and (for photos shot on black) soft faded edges. */
+    fun prepare(src: Bitmap, brightness: Float, featherPx: Float, enhance: Boolean = false): Bitmap {
         val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
         val p = Paint(Paint.FILTER_BITMAP_FLAG)
-        if (brightness != 1f) {
-            p.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setScale(brightness, brightness, brightness, 1f) })
-        }
+        val matrix = if (enhance) enhanceMatrix(src) else ColorMatrix()
+        if (brightness != 1f) matrix.postConcat(ColorMatrix().apply { setScale(brightness, brightness, brightness, 1f) })
+        if (enhance || brightness != 1f) p.colorFilter = ColorMatrixColorFilter(matrix)
         c.drawBitmap(src, 0f, 0f, p)
 
         if (featherPx > 0f) {

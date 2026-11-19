@@ -11,7 +11,8 @@ import java.io.File
 data class EditParams(
     val mode: PhotoMode = PhotoMode.BLACK,
     val tag: String = "",
-    val feather: Float = 90f,
+    val feather: Float = 100f,
+    val enhance: Boolean = true,
     val brightness: Float = 1f,
     val lighten: Boolean = true,
     val reflect: Boolean = false,
@@ -23,6 +24,7 @@ data class EditParams(
         put("mode", mode.name)
         put("tag", tag)
         put("feather", feather.toDouble())
+        put("enhance", enhance)
         put("brightness", brightness.toDouble())
         put("lighten", lighten)
         put("reflect", reflect)
@@ -40,7 +42,8 @@ data class EditParams(
                 EditParams(
                     mode = runCatching { PhotoMode.valueOf(o.optString("mode")) }.getOrDefault(PhotoMode.BLACK),
                     tag = o.optString("tag"),
-                    feather = o.optDouble("feather", 90.0).toFloat(),
+                    feather = o.optDouble("feather", 100.0).toFloat(),
+                    enhance = o.optBoolean("enhance", true),
                     brightness = o.optDouble("brightness", 1.0).toFloat(),
                     lighten = o.optBoolean("lighten", true),
                     reflect = o.optBoolean("reflect", false),

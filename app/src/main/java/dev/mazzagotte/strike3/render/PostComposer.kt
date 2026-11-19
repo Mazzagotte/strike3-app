@@ -27,8 +27,8 @@ class PostComposer(private val context: Context) {
             source(card)
         }
         val photo = found ?: throw MissingPhoto()
-        val featherPx = if (p.mode == PhotoMode.BLACK) p.feather * photo.width / 700f else 0f
-        val prepared = PhotoTools.prepare(photo, p.brightness, featherPx)
+        val featherPx = if (p.mode == PhotoMode.BLACK) PhotoTools.fadePx(p.feather, photo.width) else 0f
+        val prepared = PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance)
         renderer.compose(renderer.background(p.tag, height, p.badges), prepared, p.mode, p.lighten, p.reflect, p.placement)
     }
 
@@ -40,7 +40,11 @@ class PostComposer(private val context: Context) {
         else renderer.slide2(renderer.background(""), back, close)
     }
 
-    private fun blend(b: Bitmap) = PhotoTools.prepare(b, 1f, 90f * b.width / 700f)
+    // Back / close-up photos: trim the background, then fade the thin margin and enhance
+    private fun blend(b: Bitmap): Bitmap {
+        val t = PhotoTools.autoTrim(b)
+        return PhotoTools.prepare(t, 1f, PhotoTools.fadePx(100f, t.width), enhance = true)
+    }
 
     /** White-background listing photo. Uses the cutout, making one if needed. */
     suspend fun listing(card: Card): Bitmap = withContext(Dispatchers.Default) {

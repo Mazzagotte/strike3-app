@@ -158,6 +158,7 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
                 if (vm.mode == PhotoMode.BLACK) {
                     LabeledSlider("Edge fade", vm.feather, 0f..200f) { vm.feather = it }
                 }
+                LabeledSwitch("Auto enhance", vm.enhance) { vm.enhance = it }
                 LabeledSlider("Brightness", vm.brightness, 0.7f..1.4f) { vm.brightness = it }
                 if (vm.mode == PhotoMode.BLACK) {
                     LabeledSwitch("Hide black backdrop", vm.lighten) { vm.lighten = it }

@@ -45,7 +45,8 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     var tag by mutableStateOf("")
         private set
     var customTag by mutableStateOf("")
-    var feather by mutableFloatStateOf(90f)
+    var feather by mutableFloatStateOf(100f)
+    var enhance by mutableStateOf(true)
     var brightness by mutableFloatStateOf(1f)
     var lighten by mutableStateOf(true)
     var reflect by mutableStateOf(false)
@@ -75,7 +76,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     private var preparedCache: Pair<List<Any?>, Bitmap>? = null
 
     private data class Params(
-        val photo: Bitmap?, val mode: PhotoMode, val tag: String, val feather: Float,
+        val photo: Bitmap?, val mode: PhotoMode, val tag: String, val feather: Float, val enhance: Boolean,
         val brightness: Float, val lighten: Boolean, val reflect: Boolean, val placement: Placement,
         val badges: List<String>,
     )
@@ -94,7 +95,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun currentParams() = Params(
         photo = if (mode == PhotoMode.CUTOUT) cutoutBitmap ?: source else source,
-        mode = mode, tag = tagText, feather = feather, brightness = brightness,
+        mode = mode, tag = tagText, feather = feather, enhance = enhance, brightness = brightness,
         lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
@@ -106,10 +107,10 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun prepared(p: Params): Bitmap? {
         val photo = p.photo ?: return null
-        val featherPx = if (p.mode == PhotoMode.BLACK) p.feather * photo.width / 700f else 0f
-        val key = listOf(System.identityHashCode(photo), p.mode, featherPx, p.brightness)
+        val featherPx = if (p.mode == PhotoMode.BLACK) PhotoTools.fadePx(p.feather, photo.width) else 0f
+        val key = listOf(System.identityHashCode(photo), p.mode, featherPx, p.brightness, p.enhance)
         preparedCache?.let { if (it.first == key) return it.second }
-        return PhotoTools.prepare(photo, p.brightness, featherPx).also { preparedCache = key to it }
+        return PhotoTools.prepare(photo, p.brightness, featherPx, p.enhance).also { preparedCache = key to it }
     }
 
     private fun render(p: Params): Bitmap =
@@ -126,6 +127,9 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         editingCard = null
         badges = emptySet()
         serialBadge = ""
+        feather = 100f
+        brightness = 1f
+        enhance = true
         source = null
         cutoutBitmap = null
         originalUri = uri
@@ -203,6 +207,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         val preset = listOf("", "NEW PICKUP", "PC FAVORITE")
         if (p.tag in preset) { tag = p.tag; customTag = "" } else { tag = ""; customTag = p.tag }
         feather = p.feather
+        enhance = p.enhance
         brightness = p.brightness
         lighten = p.lighten
         reflect = p.reflect
@@ -236,7 +241,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun currentEditParams() = EditParams(
-        mode = mode, tag = tagText, feather = feather, brightness = brightness,
+        mode = mode, tag = tagText, feather = feather, enhance = enhance, brightness = brightness,
         lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
