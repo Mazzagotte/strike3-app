@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.Card
 import dev.mazzagotte.strike3.render.EditParams
+import dev.mazzagotte.strike3.render.FrameCrop
 import dev.mazzagotte.strike3.render.PhotoMode
 import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.Placement
@@ -50,6 +51,10 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     var reflect by mutableStateOf(false)
     var placement by mutableStateOf(Placement())
 
+    /** Badge toggles (AUTO, RELIC, RC, 1ST) and an optional serial number like 25/50 */
+    var badges by mutableStateOf(setOf<String>())
+    var serialBadge by mutableStateOf("")
+
     var preview by mutableStateOf<Bitmap?>(null)
         private set
     var busy by mutableStateOf<String?>(null)
@@ -58,13 +63,26 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     val tagText: String get() = customTag.trim().ifEmpty { tag }
 
+    /** Badges in display order, serial last. */
+    val badgeList: List<String>
+        get() = BADGE_ORDER.filter { it in badges } + listOfNotNull(serialBadge.trim().ifEmpty { null })
+
+    fun toggleBadge(b: String) {
+        badges = if (b in badges) badges - b else badges + b
+    }
+
     private var bgCache: Pair<String, Bitmap>? = null
     private var preparedCache: Pair<List<Any?>, Bitmap>? = null
 
     private data class Params(
         val photo: Bitmap?, val mode: PhotoMode, val tag: String, val feather: Float,
         val brightness: Float, val lighten: Boolean, val reflect: Boolean, val placement: Placement,
+        val badges: List<String>,
     )
+
+    companion object {
+        val BADGE_ORDER = listOf("AUTO", "RELIC", "RC", "1ST")
+    }
 
     init {
         viewModelScope.launch {
@@ -77,12 +95,13 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     private fun currentParams() = Params(
         photo = if (mode == PhotoMode.CUTOUT) cutoutBitmap ?: source else source,
         mode = mode, tag = tagText, feather = feather, brightness = brightness,
-        lighten = lighten, reflect = reflect, placement = placement,
+        lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
-    private fun background(tag: String): Bitmap {
-        bgCache?.let { if (it.first == tag) return it.second }
-        return renderer.background(tag).also { bgCache = tag to it }
+    private fun background(tag: String, badges: List<String>): Bitmap {
+        val key = tag + "|" + badges.joinToString(",")
+        bgCache?.let { if (it.first == key) return it.second }
+        return renderer.background(tag, PostRenderer.H, badges).also { bgCache = key to it }
     }
 
     private fun prepared(p: Params): Bitmap? {
@@ -94,7 +113,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun render(p: Params): Bitmap =
-        renderer.compose(background(p.tag), prepared(p), p.mode, p.lighten, p.reflect, p.placement)
+        renderer.compose(background(p.tag, p.badges), prepared(p), p.mode, p.lighten, p.reflect, p.placement)
 
     /** Full-quality finished post. */
     suspend fun renderFinal(): Bitmap {
@@ -102,8 +121,11 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         return withContext(Dispatchers.Default) { render(p) }
     }
 
-    fun load(uri: Uri) {
+    /** [frame]: set for camera photos (crop to the guide); gallery photos are auto-trimmed. */
+    fun load(uri: Uri, frame: FrameCrop? = null) {
         editingCard = null
+        badges = emptySet()
+        serialBadge = ""
         source = null
         cutoutBitmap = null
         originalUri = uri
@@ -116,9 +138,17 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             busy = "Loading photo…"
             try {
-                val bmp = withContext(Dispatchers.IO) { PhotoTools.decode(getApplication<Application>(), uri) }
+                val decoded = withContext(Dispatchers.IO) { PhotoTools.decode(getApplication<Application>(), uri) }
+                val transparent = withContext(Dispatchers.Default) { PhotoTools.hasTransparency(decoded) }
+                val bmp = withContext(Dispatchers.Default) {
+                    when {
+                        transparent -> decoded
+                        frame != null -> PhotoTools.cropToFrame(decoded, frame)
+                        else -> PhotoTools.autoTrim(decoded)
+                    }
+                }
                 source = bmp
-                if (withContext(Dispatchers.Default) { PhotoTools.hasTransparency(bmp) }) {
+                if (transparent) {
                     // Already a cutout (e.g. Samsung "Save as image")
                     cutoutBitmap = withContext(Dispatchers.Default) { PhotoTools.cropToContent(bmp) }
                     mode = PhotoMode.CUTOUT
@@ -177,6 +207,8 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         lighten = p.lighten
         reflect = p.reflect
         placement = p.placement
+        badges = p.badges.filter { it in BADGE_ORDER }.toSet()
+        serialBadge = p.badges.firstOrNull { it !in BADGE_ORDER }.orEmpty()
         mode = PhotoMode.BLACK
         viewModelScope.launch {
             busy = "Loading photo…"
@@ -205,7 +237,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
 
     fun currentEditParams() = EditParams(
         mode = mode, tag = tagText, feather = feather, brightness = brightness,
-        lighten = lighten, reflect = reflect, placement = placement,
+        lighten = lighten, reflect = reflect, placement = placement, badges = badgeList,
     )
 
     /** Saves the source photo (and cutout) privately so the post can be re-edited later. */
@@ -231,6 +263,10 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
             editParams = currentEditParams().toJson(),
             sourcePath = sourcePath,
             cutoutPath = cutoutPath,
+            isAuto = "AUTO" in badges,
+            isPatch = "RELIC" in badges,
+            isRookie = "RC" in badges,
+            serial = serialBadge.trim().ifEmpty { card.serial },
         )
         (app as Strike3App).repo.update(updated)
         editingCard = null

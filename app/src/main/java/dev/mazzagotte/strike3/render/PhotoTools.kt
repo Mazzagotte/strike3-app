@@ -16,9 +16,20 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.tasks.await
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+/** The on-screen guide frame at capture time, in preview-view pixels. */
+data class FrameCrop(
+    val viewW: Int,
+    val viewH: Int,
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+)
 
 object PhotoTools {
 
@@ -85,6 +96,80 @@ object PhotoTools {
         }
         if (r < l || b < t) return bmp
         return Bitmap.createBitmap(bmp, l, t, r - l + 1, b - t + 1)
+    }
+
+    /**
+     * Crops a camera photo to the gold guide frame shown on screen (plus a small margin).
+     * The preview fills the screen (center-crop), so screen coordinates are mapped back
+     * onto the photo the same way.
+     */
+    fun cropToFrame(bmp: Bitmap, f: FrameCrop): Bitmap {
+        if (f.viewW <= 0 || f.viewH <= 0) return bmp
+        val scale = max(f.viewW.toFloat() / bmp.width, f.viewH.toFloat() / bmp.height)
+        val offX = (f.viewW - bmp.width * scale) / 2f
+        val offY = (f.viewH - bmp.height * scale) / 2f
+        val mx = (f.right - f.left) * 0.06f
+        val my = (f.bottom - f.top) * 0.05f
+        val l = (((f.left - mx) - offX) / scale).roundToInt().coerceIn(0, bmp.width - 1)
+        val t = (((f.top - my) - offY) / scale).roundToInt().coerceIn(0, bmp.height - 1)
+        val r = (((f.right + mx) - offX) / scale).roundToInt().coerceIn(l + 1, bmp.width)
+        val b = (((f.bottom + my) - offY) / scale).roundToInt().coerceIn(t + 1, bmp.height)
+        return Bitmap.createBitmap(bmp, l, t, r - l, b - t)
+    }
+
+    /**
+     * Trims plain background from around the card (for gallery photos). Looks at the photo's
+     * border to learn the background, finds where the card is, and keeps it with a small margin.
+     * Returns the photo unchanged if it can't find a clear card.
+     */
+    fun autoTrim(bmp: Bitmap): Bitmap {
+        val k = 256f / max(bmp.width, bmp.height)
+        val sw = max(8, (bmp.width * k).roundToInt())
+        val sh = max(8, (bmp.height * k).roundToInt())
+        val small = Bitmap.createScaledBitmap(bmp, sw, sh, true)
+        val px = IntArray(sw * sh)
+        small.getPixels(px, 0, sw, 0, 0, sw, sh)
+
+        fun r(c: Int) = (c shr 16) and 0xFF
+        fun g(c: Int) = (c shr 8) and 0xFF
+        fun b(c: Int) = c and 0xFF
+
+        // Background color = median of the outer ring
+        val ring = max(2, min(sw, sh) / 30)
+        val border = ArrayList<Int>()
+        for (y in 0 until sh) for (x in 0 until sw) {
+            if (x < ring || y < ring || x >= sw - ring || y >= sh - ring) border += px[y * sw + x]
+        }
+        val br = border.map { r(it) }.sorted()[border.size / 2]
+        val bg = border.map { g(it) }.sorted()[border.size / 2]
+        val bb = border.map { b(it) }.sorted()[border.size / 2]
+
+        val colCount = IntArray(sw)
+        val rowCount = IntArray(sh)
+        for (y in 0 until sh) for (x in 0 until sw) {
+            val c = px[y * sw + x]
+            val d = abs(r(c) - br) + abs(g(c) - bg) + abs(b(c) - bb)
+            if (d > 75) { colCount[x]++; rowCount[y]++ }
+        }
+        val colMin = max(2, (sh * 0.06f).roundToInt())
+        val rowMin = max(2, (sw * 0.06f).roundToInt())
+        val x0 = colCount.indexOfFirst { it >= colMin }
+        val x1 = colCount.indexOfLast { it >= colMin }
+        val y0 = rowCount.indexOfFirst { it >= rowMin }
+        val y1 = rowCount.indexOfLast { it >= rowMin }
+        if (x0 < 0 || y0 < 0 || x1 <= x0 || y1 <= y0) return bmp
+
+        val boxArea = (x1 - x0 + 1f) * (y1 - y0 + 1f)
+        val area = sw.toFloat() * sh
+        if (boxArea > area * 0.9f || boxArea < area * 0.04f) return bmp
+
+        val mx = (x1 - x0) * 0.05f
+        val my = (y1 - y0) * 0.04f
+        val l = ((x0 - mx) / k).roundToInt().coerceIn(0, bmp.width - 1)
+        val t = ((y0 - my) / k).roundToInt().coerceIn(0, bmp.height - 1)
+        val rr = ((x1 + 1 + mx) / k).roundToInt().coerceIn(l + 1, bmp.width)
+        val bbm = ((y1 + 1 + my) / k).roundToInt().coerceIn(t + 1, bmp.height)
+        return Bitmap.createBitmap(bmp, l, t, rr - l, bbm - t)
     }
 
     /** Brightness and (for photos shot on black) soft faded edges. */

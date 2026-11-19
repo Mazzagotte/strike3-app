@@ -53,7 +53,7 @@ class PostRenderer(context: Context) {
      * [height] 1350 = feed post (4:5), 1920 = Story / Reel cover (9:16). The 4:5 layout is centered
      * vertically on taller canvases so it sits clear of Instagram's Story controls.
      */
-    fun background(tag: String, height: Int = H): Bitmap {
+    fun background(tag: String, height: Int = H, badges: List<String> = emptyList()): Bitmap {
         val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val offY = (height - H) / 2f
@@ -93,6 +93,7 @@ class PostRenderer(context: Context) {
         }
         c.drawRect(140f, FLOOR - 1f, 940f, FLOOR + 1f, edge)
         drawTag(c, tag.trim().uppercase())
+        drawBadges(c, badges)
         drawWordmark(c)
         c.restore()
         return bmp
@@ -302,6 +303,36 @@ class PostRenderer(context: Context) {
             color = 0xFFC9A24A.toInt()
         }
         c.drawText("CARDS", tx, base + 28f, cards)
+    }
+
+    /**
+     * Card badges along the top-left: AUTO and the serial number in gold, RELIC / RC / 1ST in silver.
+     */
+    private fun drawBadges(c: Canvas, badges: List<String>) {
+        var x = 90f
+        val y = 84f
+        val ph = 44f
+        badges.map { it.trim().uppercase() }.filter { it.isNotEmpty() }.forEach { text ->
+            val gold = text == "AUTO" || text.contains('/')
+            val accent = if (gold) 0xFFE2C477.toInt() else 0xFFD3D8DE.toInt()
+            val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = tagFont
+                textSize = 22f
+                letterSpacing = 3f / 22f
+                color = accent
+            }
+            val pw = tp.measureText(text) + 36f
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x990A0B0D.toInt() }
+            c.drawRoundRect(x, y, x + pw, y + ph, 8f, 8f, fill)
+            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = 2f
+                color = if (gold) 0xFFC9A24A.toInt() else 0xFF9AA1AB.toInt()
+            }
+            c.drawRoundRect(x, y, x + pw, y + ph, 8f, 8f, stroke)
+            val fm = tp.fontMetrics
+            c.drawText(text, x + 18f, y + ph / 2f - (fm.ascent + fm.descent) / 2f, tp)
+            x += pw + 12f
+        }
     }
 
     private fun drawTag(c: Canvas, text: String) {

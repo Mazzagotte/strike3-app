@@ -107,7 +107,7 @@ object Media {
         val flags = listOfNotNull(
             "AUTO".takeIf { card.isAuto },
             "RC".takeIf { card.isRookie },
-            "PATCH".takeIf { card.isPatch },
+            "RELIC".takeIf { card.isPatch },
         )
         if (flags.isNotEmpty()) lines += flags.joinToString(" • ")
         val tags = listOfNotNull(

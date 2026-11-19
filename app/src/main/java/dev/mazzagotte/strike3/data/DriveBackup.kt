@@ -131,7 +131,7 @@ object DriveBackup {
 
     private fun toCsv(cards: List<Card>): String {
         val header = listOf(
-            "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Patch",
+            "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
             "Date acquired", "Price paid", "Posted", "Notes",
         )
         val rows = cards.map { c ->

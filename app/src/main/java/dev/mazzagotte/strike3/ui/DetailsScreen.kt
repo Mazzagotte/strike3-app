@@ -57,7 +57,17 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     val context = LocalContext.current
     val repo = (context.applicationContext as Strike3App).repo
     val scope = rememberCoroutineScope()
-    var card by remember { mutableStateOf(Card(dateAcquired = LocalDate.now().toString())) }
+    var card by remember {
+        mutableStateOf(
+            Card(
+                dateAcquired = LocalDate.now().toString(),
+                isAuto = "AUTO" in editor.badges,
+                isPatch = "RELIC" in editor.badges,
+                isRookie = "RC" in editor.badges,
+                serial = editor.serialBadge.trim(),
+            ),
+        )
+    }
     var loaded by remember { mutableStateOf(editId == null) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -167,7 +177,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(card.isAuto, { card = card.copy(isAuto = !card.isAuto) }, { Text("Auto") })
                 FilterChip(card.isRookie, { card = card.copy(isRookie = !card.isRookie) }, { Text("Rookie") })
-                FilterChip(card.isPatch, { card = card.copy(isPatch = !card.isPatch) }, { Text("Patch") })
+                FilterChip(card.isPatch, { card = card.copy(isPatch = !card.isPatch) }, { Text("Relic") })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field("Date acquired", card.dateAcquired, modifier = Modifier.weight(0.55f)) { card = card.copy(dateAcquired = it) }

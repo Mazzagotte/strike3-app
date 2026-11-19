@@ -29,7 +29,7 @@ class PostComposer(private val context: Context) {
         val photo = found ?: throw MissingPhoto()
         val featherPx = if (p.mode == PhotoMode.BLACK) p.feather * photo.width / 700f else 0f
         val prepared = PhotoTools.prepare(photo, p.brightness, featherPx)
-        renderer.compose(renderer.background(p.tag, height), prepared, p.mode, p.lighten, p.reflect, p.placement)
+        renderer.compose(renderer.background(p.tag, height, p.badges), prepared, p.mode, p.lighten, p.reflect, p.placement)
     }
 
     /** Carousel slide 2 (back + close-up). Null when neither photo has been added. */

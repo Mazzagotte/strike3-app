@@ -48,8 +48,8 @@ fun AppRoot(
                 onSettings = { nav.go(Screen.Settings) },
             )
             Screen.Capture -> CaptureScreen(
-                onPhoto = { uri ->
-                    editor.load(uri)
+                onPhoto = { uri, frame ->
+                    editor.load(uri, frame)
                     nav.go(Screen.Editor)
                 },
                 onBack = nav::back,

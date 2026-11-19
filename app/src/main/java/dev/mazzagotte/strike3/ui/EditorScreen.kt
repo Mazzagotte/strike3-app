@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.render.PhotoMode
@@ -128,6 +129,26 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
                     label = { Text("Custom tag (optional)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            Section("Badges") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("AUTO" to "Auto", "RELIC" to "Relic", "RC" to "Rookie", "1ST" to "1st").forEach { (value, label) ->
+                        FilterChip(
+                            selected = value in vm.badges,
+                            onClick = { vm.toggleBadge(value) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = vm.serialBadge,
+                    onValueChange = { vm.serialBadge = it.take(10) },
+                    label = { Text("Serial number (e.g. 25/50)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

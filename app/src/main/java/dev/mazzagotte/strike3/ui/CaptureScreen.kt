@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
@@ -64,19 +65,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.mazzagotte.strike3.render.FrameCrop
 import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 @Composable
-fun CaptureScreen(onPhoto: (Uri) -> Unit, onBack: () -> Unit) {
+fun CaptureScreen(onPhoto: (Uri, FrameCrop?) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     var hasCamera by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCamera = it }
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) onPhoto(uri)
+        if (uri != null) onPhoto(uri, null)
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -113,7 +115,7 @@ fun CaptureScreen(onPhoto: (Uri) -> Unit, onBack: () -> Unit) {
 }
 
 @Composable
-private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
+private fun CameraWithGuide(onPhoto: (Uri, FrameCrop?) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember {
@@ -205,7 +207,15 @@ private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
                             object : ImageCapture.OnImageSavedCallback {
                                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                                     busy = false
-                                    result.savedUri?.let(onPhoto) ?: run { error = "Photo wasn't saved, try again." }
+                                    val uri = result.savedUri
+                                    if (uri == null) {
+                                        error = "Photo wasn't saved, try again."
+                                    } else {
+                                        val w = previewView.width
+                                        val h = previewView.height
+                                        val g = guideRect(w.toFloat(), h.toFloat())
+                                        onPhoto(uri, FrameCrop(w, h, g.left, g.top, g.right, g.bottom))
+                                    }
                                 }
 
                                 override fun onError(exception: ImageCaptureException) {
@@ -222,14 +232,24 @@ private fun CameraWithGuide(onPhoto: (Uri) -> Unit) {
     }
 }
 
+/** The card-in-holder shaped guide frame, shared by the overlay and the crop. */
+private fun guideRect(width: Float, height: Float): Rect {
+    val w = width * 0.72f
+    val h = w / 0.68f
+    val left = (width - w) / 2f
+    val top = (height - h) / 2f - height * 0.04f
+    return Rect(left, top, left + w, top + h)
+}
+
 /** Dims everything outside a card-in-holder shaped frame. */
 @Composable
 private fun CardGuide() {
     Canvas(Modifier.fillMaxSize()) {
-        val w = size.width * 0.72f
-        val h = w / 0.68f
-        val left = (size.width - w) / 2f
-        val top = (size.height - h) / 2f - size.height * 0.04f
+        val g = guideRect(size.width, size.height)
+        val w = g.width
+        val h = g.height
+        val left = g.left
+        val top = g.top
         val radius = CornerRadius(w * 0.05f)
         val frame = Path().apply {
             addRoundRect(androidx.compose.ui.geometry.RoundRect(left, top, left + w, top + h, radius))

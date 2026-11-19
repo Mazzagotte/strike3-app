@@ -3,6 +3,7 @@ package dev.mazzagotte.strike3.render
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -15,6 +16,8 @@ data class EditParams(
     val lighten: Boolean = true,
     val reflect: Boolean = false,
     val placement: Placement = Placement(),
+    /** Card badges shown on the post, e.g. AUTO, RELIC, RC, 1ST, 25/50 */
+    val badges: List<String> = emptyList(),
 ) {
     fun toJson(): String = JSONObject().apply {
         put("mode", mode.name)
@@ -26,6 +29,7 @@ data class EditParams(
         put("scale", placement.scale.toDouble())
         put("dx", placement.dx.toDouble())
         put("dy", placement.dy.toDouble())
+        put("badges", JSONArray(badges))
     }.toString()
 
     companion object {
@@ -45,6 +49,7 @@ data class EditParams(
                         dx = o.optDouble("dx", 0.0).toFloat(),
                         dy = o.optDouble("dy", 0.0).toFloat(),
                     ),
+                    badges = o.optJSONArray("badges")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
                 )
             } catch (_: Exception) {
                 EditParams()

@@ -190,7 +190,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
 
             Section("Carousel") {
                 Text(
-                    "Slide 1 is the post. Slide 2 shows the back and a close-up (serial, auto or patch) side by side.",
+                    "Slide 1 is the post. Slide 2 shows the back and a close-up (serial, auto or relic) side by side.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -225,7 +225,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                 Detail("Team", c.team)
                 Detail(
                     "Type",
-                    listOfNotNull("Auto".takeIf { c.isAuto }, "Rookie".takeIf { c.isRookie }, "Patch".takeIf { c.isPatch }).joinToString(", "),
+                    listOfNotNull("Auto".takeIf { c.isAuto }, "Rookie".takeIf { c.isRookie }, "Relic".takeIf { c.isPatch }).joinToString(", "),
                 )
                 Detail("Date acquired", c.dateAcquired)
                 Detail("Price paid", c.pricePaid)
