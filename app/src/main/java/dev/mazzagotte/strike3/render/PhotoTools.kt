@@ -33,6 +33,9 @@ data class FrameCrop(
 )
 
 object PhotoTools {
+    /** Margin autoTrim leaves around the holder, as a fraction of the holder's long side. */
+    const val TRIM_MARGIN = 0.04f
+
 
     /** Decodes a photo (EXIF rotation handled), shrunk so the long side is at most [maxSide]. */
     fun decode(context: Context, uri: Uri, maxSide: Int = 2000): Bitmap {
@@ -164,8 +167,9 @@ object PhotoTools {
         val area = sw.toFloat() * sh
         if (boxArea > area * 0.9f || boxArea < area * 0.04f) return bmp
 
-        val mx = (x1 - x0) * 0.05f
-        val my = (y1 - y0) * 0.04f
+        // Same margin on every side: TRIM_MARGIN of the holder's long side (the post sizes cards from this)
+        val mx = max(x1 - x0, y1 - y0) * TRIM_MARGIN
+        val my = mx
         val l = ((x0 - mx) / k).roundToInt().coerceIn(0, bmp.width - 1)
         val t = ((y0 - my) / k).roundToInt().coerceIn(0, bmp.height - 1)
         val rr = ((x1 + 1 + mx) / k).roundToInt().coerceIn(l + 1, bmp.width)

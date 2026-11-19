@@ -2,7 +2,6 @@ package dev.mazzagotte.strike3.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -170,7 +168,6 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
             }
 
             Section("Adjust") {
-                LabeledSlider("Size", vm.placement.scale, 0.4f..1.8f) { vm.placement = vm.placement.copy(scale = it) }
                 if (vm.mode == PhotoMode.BLACK) {
                     LabeledSlider("Edge fade", vm.feather, 0f..200f) { vm.feather = it }
                 }
@@ -181,7 +178,6 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
                     LabeledSwitch("Hide black backdrop", vm.lighten) { vm.lighten = it }
                 }
                 LabeledSwitch("Floor reflection", vm.reflect) { vm.reflect = it }
-                OutlinedButton(onClick = vm::resetPosition, modifier = Modifier.fillMaxWidth()) { Text("Reset position") }
             }
 
             Button(
@@ -208,18 +204,7 @@ private fun PostPreview(vm: EditorViewModel) {
             .fillMaxWidth()
             .aspectRatio(PostRenderer.W / PostRenderer.H.toFloat())
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val k = PostRenderer.W / size.width.toFloat()
-                    val p = vm.placement
-                    vm.placement = p.copy(
-                        scale = (p.scale * zoom).coerceIn(0.4f, 1.8f),
-                        dx = p.dx + pan.x * k,
-                        dy = p.dy + pan.y * k,
-                    )
-                }
-            },
+            .background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         vm.preview?.let {
@@ -232,11 +217,6 @@ private fun PostPreview(vm: EditorViewModel) {
             }
         }
     }
-    Text(
-        "Drag to move the card, pinch to resize.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 @Composable

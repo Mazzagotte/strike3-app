@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
+import kotlin.math.max
 import kotlin.math.min
 
 enum class PhotoMode { BLACK, CUTOUT }
@@ -29,6 +30,8 @@ class PostRenderer(context: Context) {
         const val W = 1080
         const val H = 1350
         const val FLOOR = 1015f
+        /** Long side of every card holder on the post, in pixels */
+        const val CARD_LONG = 860f
 
         private val SIL = intArrayOf(0xFFE6E9ED.toInt(), 0xFFBFC4CB.toInt(), 0xFFF3F5F7.toInt(), 0xFFA4AAB3.toInt(), 0xFFCFD3D9.toInt())
         private val GLD = intArrayOf(0xFFF1D58A.toInt(), 0xFFC39434.toInt(), 0xFFF4DC98.toInt(), 0xFFA27522.toInt(), 0xFFCFA64C.toInt())
@@ -192,16 +195,21 @@ class PostRenderer(context: Context) {
         return RectF(x, y, x + w, y + h)
     }
 
-    /** Cutouts stand on the floor; photos shot on black sit centered in the spotlight. */
+    /**
+     * Every card is drawn the same size in the same spot, for a consistent feed: the holder's long side
+     * is always CARD_LONG pixels (a landscape card is the same holder turned sideways), centered, standing
+     * on the floor. Photos shot on black still carry the trim margin around the holder, so that margin is
+     * added on top of the holder size and the holder's bottom edge (not the photo's) sits on the floor.
+     * [pl] is ignored; it's kept so older saved posts still load.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun photoRect(pw: Int, ph: Int, mode: PhotoMode, pl: Placement): RectF {
-        val cut = mode == PhotoMode.CUTOUT
-        val bw = if (cut) 600f else 780f
-        val bh = if (cut) 860f else 1000f
-        val s = min(bw / pw, bh / ph) * pl.scale
+        val margin = if (mode == PhotoMode.BLACK) PhotoTools.TRIM_MARGIN * CARD_LONG else 0f
+        val s = (CARD_LONG + 2f * margin) / max(pw, ph)
         val w = pw * s
         val h = ph * s
-        val x = 540f - w / 2f + pl.dx
-        val y = (if (cut) FLOOR + 5f - h else 580f - h / 2f) + pl.dy
+        val x = 540f - w / 2f
+        val y = FLOOR + 5f + margin - h
         return RectF(x, y, x + w, y + h)
     }
 

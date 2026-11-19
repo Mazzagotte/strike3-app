@@ -163,7 +163,7 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
                 val bmp = withContext(Dispatchers.Default) {
                     when {
                         transparent -> decoded
-                        frame != null -> PhotoTools.cropToFrame(decoded, frame)
+                        frame != null -> PhotoTools.autoTrim(PhotoTools.cropToFrame(decoded, frame))
                         else -> PhotoTools.autoTrim(decoded)
                     }
                 }
