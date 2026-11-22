@@ -2,6 +2,21 @@ package dev.mazzagotte.strike3.ui
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.text.style.TextOverflow
+import dev.mazzagotte.strike3.render.EditParams
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -82,11 +97,20 @@ private enum class Slot { BACK, CLOSE_UP }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack: () -> Unit) {
+fun CardScreen(
+    id: Long,
+    onEdit: () -> Unit,
+    onEditPost: (Card) -> Unit,
+    onBack: () -> Unit,
+    onShowPlayer: (String) -> Unit = {},
+    /** "3 of 12" when swiping through search results */
+    position: String? = null,
+) {
     val context = LocalContext.current
     val repo = remember { (context.applicationContext as Strike3App).repo }
     val composer = remember { PostComposer(context.applicationContext) }
     val card by remember(id) { repo.card(id) }.collectAsState(initial = null)
+    val allCards by remember { repo.cards() }.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf<String?>(null) }
@@ -143,7 +167,14 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(card?.title ?: "") },
+                title = {
+                    Column {
+                        Text(card?.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        position?.let {
+                            Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "Edit details") }
@@ -161,11 +192,21 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                CardImage(c, 1400, Modifier.fillMaxWidth().aspectRatio(1080f / 1350f).clip(RoundedCornerShape(10.dp)))
+                CardViewer(c)
                 working?.let {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Text(it, modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
+            }
+
+            val player = c.player.trim()
+            if (player.isNotEmpty()) {
+                val count = allCards.count { it.player.trim().equals(player, ignoreCase = true) }
+                if (count > 1) {
+                    TextButton(onClick = { onShowPlayer(player) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("All $count $player cards →")
                     }
                 }
             }
@@ -395,5 +436,124 @@ private fun Detail(label: String, value: String) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, fontWeight = FontWeight.Medium)
         HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+/** Which picture the card page is showing. */
+private enum class Side(val label: String) { FRONT("Front"), BACK("Back"), POST("Post") }
+
+/**
+ * Card picture with Front / Back / Post. Tap to flip between front and back, pinch to zoom
+ * (drag to look around while zoomed), double-tap to zoom back out.
+ */
+@Composable
+private fun CardViewer(c: Card) {
+    val sides = listOfNotNull(
+        Side.FRONT.takeIf { c.sourcePath != null },
+        Side.BACK.takeIf { c.backPath != null },
+        Side.POST.takeIf { c.postUri != null },
+    )
+    var side by remember(c.id) { mutableStateOf(sides.firstOrNull() ?: Side.POST) }
+    if (side !in sides && sides.isNotEmpty()) side = sides.first()
+    var scale by remember(c.id, side) { mutableFloatStateOf(1f) }
+    var offset by remember(c.id, side) { mutableStateOf(Offset.Zero) }
+    val turn = remember(c.editParams) { EditParams.fromJson(c.editParams).rotation }
+
+    fun flip() {
+        side = when (side) {
+            Side.BACK -> if (Side.FRONT in sides) Side.FRONT else Side.POST
+            else -> if (Side.BACK in sides) Side.BACK else side
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1080f / 1350f)
+                .clip(RoundedCornerShape(10.dp))
+                .pointerInput(sides) {
+                    detectTapGestures(
+                        onTap = { flip() },
+                        onDoubleTap = { scale = 1f; offset = Offset.Zero },
+                    )
+                }
+                .pointerInput(c.id, side) {
+                    // Two fingers to zoom; one finger pans only while zoomed, so swiping between cards still works
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val fingers = event.changes.count { it.pressed }
+                            if (fingers >= 2 || scale > 1f) {
+                                val newScale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
+                                val maxX = (newScale - 1f) * size.width / 2f
+                                val maxY = (newScale - 1f) * size.height / 2f
+                                val moved = offset + event.calculatePan()
+                                scale = newScale
+                                offset = if (newScale == 1f) Offset.Zero
+                                else Offset(moved.x.coerceIn(-maxX, maxX), moved.y.coerceIn(-maxY, maxY))
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
+                },
+        ) {
+            Crossfade(targetState = side, label = "side") { s ->
+                val m = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = scale; scaleY = scale
+                    translationX = offset.x; translationY = offset.y
+                }
+                when (s) {
+                    Side.FRONT -> PhotoImage(c.sourcePath, turn, 1600, m)
+                    Side.BACK -> PhotoImage(c.backPath, 0, 1600, m)
+                    Side.POST -> UriImage(c.postUri, 1400, m)
+                }
+            }
+        }
+        if (sides.size > 1) {
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                sides.forEachIndexed { i, s ->
+                    SegmentedButton(
+                        selected = side == s,
+                        onClick = { side = s },
+                        shape = SegmentedButtonDefaults.itemShape(i, sides.size),
+                    ) { Text(s.label) }
+                }
+            }
+        }
+        Text(
+            if (Side.BACK in sides) "Tap to flip · pinch to zoom · double-tap to reset" else "Pinch to zoom · double-tap to reset",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+    }
+}
+
+/** Swipe left and right through the cards from the collection's current search. */
+@Composable
+fun CardPagerScreen(
+    ids: List<Long>,
+    startId: Long,
+    onPageChange: (Long) -> Unit,
+    onEdit: (Long) -> Unit,
+    onEditPost: (Card) -> Unit,
+    onBack: () -> Unit,
+    onShowPlayer: (String) -> Unit,
+) {
+    val list = if (startId in ids) ids else listOf(startId)
+    val pager = rememberPagerState(initialPage = list.indexOf(startId)) { list.size }
+    LaunchedEffect(pager.settledPage) { onPageChange(list[pager.settledPage]) }
+    HorizontalPager(state = pager, key = { list[it] }) { page ->
+        val id = list[page]
+        CardScreen(
+            id = id,
+            onEdit = { onEdit(id) },
+            onEditPost = onEditPost,
+            onBack = onBack,
+            onShowPlayer = onShowPlayer,
+            position = if (list.size > 1) "${page + 1} of ${list.size}" else null,
+        )
     }
 }

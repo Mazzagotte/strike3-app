@@ -5,6 +5,13 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 
 ## What it does
 
+**Collection**
+- Search with several words in any order ("judge 2024 chrome auto"). Special words: auto, rc/rookie, relic/patch, numbered, 1/1, posted, and /99 for a print run. Player and team names allow a small typo.
+- Filters: Autos, Rookies, Numbered, 1/1, Posted / Not posted, plus Team, Set and Year lists built from your cards (with counts).
+- Sort: newest, oldest, player A–Z, year, or print run (lowest first).
+- View: 2 or 3 columns or a list, card front photos or posts, and grouping by player with counts. A summary line shows cards, players, autos and numbered for what's on screen. Search and filters stay put when you open a card and come back.
+- Card page: swipe left/right through the current results, Front / Back / Post views, tap to flip, pinch to zoom, double-tap to reset, and "All N player cards" to jump back to that player's cards.
+
 **Catalog (Add card)**
 - Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.
 - The back reader checks the text against every player name already in your collection (allowing small misreads and names split over two lines), so it gets better the more you catalog. Fix a wrong name once and it's learned.

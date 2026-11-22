@@ -17,7 +17,8 @@ sealed interface Screen {
     data object Editor : Screen
     /** editId == null: new card, from the post just made or (catalog) from the front photo only. */
     data class Details(val editId: Long?, val catalog: Boolean = false) : Screen
-    data class CardView(val id: Long) : Screen
+    /** [ids]: the collection results it was opened from, for swiping between cards. */
+    data class CardView(val id: Long, val ids: List<Long> = listOf(id)) : Screen
     data object Settings : Screen
 }
 
@@ -27,6 +28,8 @@ class NavViewModel : ViewModel() {
     val canGoBack: Boolean get() = stack.size > 1
 
     fun go(s: Screen) { stack.add(s) }
+    /** Swaps the screen on top without adding to the back stack (e.g. which card is showing). */
+    fun replaceTop(s: Screen) { stack[stack.lastIndex] = s }
     fun back() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
     fun resetTo(s: Screen) {
         stack.clear()
@@ -39,6 +42,7 @@ class NavViewModel : ViewModel() {
 fun AppRoot(
     nav: NavViewModel = viewModel(),
     editor: EditorViewModel = viewModel(),
+    collection: CollectionViewModel = viewModel(),
 ) {
     BackHandler(enabled = nav.canGoBack) { nav.back() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -46,7 +50,8 @@ fun AppRoot(
             Screen.Collection -> CollectionScreen(
                 onNewPost = { nav.go(Screen.Capture()) },
                 onAddCard = { nav.go(Screen.Capture(catalog = true)) },
-                onOpen = { nav.go(Screen.CardView(it)) },
+                vm = collection,
+                onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
                 onSettings = { nav.go(Screen.Settings) },
             )
             is Screen.Capture -> CaptureScreen(
@@ -69,14 +74,21 @@ fun AppRoot(
                 onDone = { id -> nav.resetTo(Screen.CardView(id)) },
                 onBack = nav::back,
             )
-            is Screen.CardView -> CardScreen(
-                id = s.id,
-                onEdit = { nav.go(Screen.Details(s.id)) },
+            is Screen.CardView -> CardPagerScreen(
+                ids = s.ids,
+                startId = s.id,
+                // Remember which card is showing, so coming back from editing lands on it
+                onPageChange = { id -> if (id != s.id && nav.current == s) nav.replaceTop(s.copy(id = id)) },
+                onEdit = { id -> nav.go(Screen.Details(id)) },
                 onEditPost = { card ->
                     editor.loadForCard(card)
                     nav.go(Screen.Editor)
                 },
                 onBack = nav::back,
+                onShowPlayer = { player ->
+                    collection.showPlayer(player)
+                    nav.resetTo(Screen.Collection)
+                },
             )
             Screen.Settings -> SettingsScreen(onBack = nav::back)
         }
