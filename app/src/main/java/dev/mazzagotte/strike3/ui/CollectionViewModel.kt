@@ -29,6 +29,8 @@ class CollectionViewModel(app: Application) : AndroidViewModel(app) {
     var numbered by mutableStateOf(false)
     var oneOfOnes by mutableStateOf(false)
     var needsReview by mutableStateOf(false)
+    /** Cards with no current value yet (from the value page) */
+    var noValue by mutableStateOf(false)
     /** null = either, true = posted only, false = not posted only */
     var posted by mutableStateOf<Boolean?>(null)
 
@@ -53,10 +55,10 @@ class CollectionViewModel(app: Application) : AndroidViewModel(app) {
     fun updateGroup(v: Boolean) { groupByPlayer = v; prefs.edit().putBoolean("group", v).apply() }
 
     val anyFilter: Boolean
-        get() = needsReview || autos || rookies || numbered || oneOfOnes || posted != null || team != null || set != null || year != null
+        get() = noValue || needsReview || autos || rookies || numbered || oneOfOnes || posted != null || team != null || set != null || year != null
 
     fun clearFilters() {
-        needsReview = false; autos = false; rookies = false; numbered = false; oneOfOnes = false; posted = null
+        noValue = false; needsReview = false; autos = false; rookies = false; numbered = false; oneOfOnes = false; posted = null
         team = null; set = null; year = null
     }
 
@@ -70,6 +72,7 @@ class CollectionViewModel(app: Application) : AndroidViewModel(app) {
         val shown = cards.filter { c ->
             CardSearch.matches(c, query) &&
                 (!needsReview || c.needsReview) &&
+                (!noValue || c.valueNumber == null) &&
                 (!autos || c.isAuto) &&
                 (!rookies || c.isRookie) &&
                 (!numbered || c.serial.isNotBlank()) &&

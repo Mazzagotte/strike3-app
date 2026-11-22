@@ -18,6 +18,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Duplicate check: saving a card with the same player, year, set, parallel and serial as one you already have asks first.
 - Current value on each card (price paid is no longer shown). Sort by value; the summary line and Stats show totals.
 - Stats page (chart icon): totals, value and most valuable cards, top players, teams, years, sets, and cards added by month. Tap a row to see those cards.
+- Value page ($ icon): total worth, how many cards are priced (tap to see the unpriced ones), most valuable cards, value by player, set, team and year, and how much sits in autos, numbered and rookies.
 - Settings › Export CSV saves the whole collection as a spreadsheet anywhere.
 - Settings › Import CSV brings spreadsheet edits back: rows match cards by the ID column, rows without an ID become new cards (no photos), and you confirm the counts first. Serials are exported as ="1/1" so Sheets and Excel don't turn them into dates.
 

@@ -22,6 +22,7 @@ sealed interface Screen {
     data object Settings : Screen
     data object Batch : Screen
     data object Stats : Screen
+    data object Value : Screen
 }
 
 class NavViewModel : ViewModel() {
@@ -58,6 +59,7 @@ fun AppRoot(
                     nav.go(Screen.Batch)
                 },
                 onStats = { nav.go(Screen.Stats) },
+                onValue = { nav.go(Screen.Value) },
                 vm = collection,
                 onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
                 onSettings = { nav.go(Screen.Settings) },
@@ -97,6 +99,17 @@ fun AppRoot(
             Screen.Stats -> StatsScreen(
                 onBack = nav::back,
                 onOpen = { id -> nav.go(Screen.CardView(id)) },
+                onFilter = { apply ->
+                    collection.clearFilters()
+                    collection.query = ""
+                    apply(collection)
+                    nav.resetTo(Screen.Collection)
+                },
+                onValue = { nav.go(Screen.Value) },
+            )
+            Screen.Value -> ValueScreen(
+                onBack = nav::back,
+                onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
                 onFilter = { apply ->
                     collection.clearFilters()
                     collection.query = ""

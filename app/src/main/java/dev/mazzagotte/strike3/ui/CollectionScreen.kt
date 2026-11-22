@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
@@ -90,6 +91,7 @@ fun CollectionScreen(
     onAddCard: () -> Unit,
     onBatch: () -> Unit,
     onStats: () -> Unit,
+    onValue: () -> Unit,
     /** Opens a card; [ids] is the current results in order, for swiping between cards. */
     onOpen: (id: Long, ids: List<Long>) -> Unit,
     onSettings: () -> Unit,
@@ -151,6 +153,7 @@ fun CollectionScreen(
                             )
                         }
                     }
+                    IconButton(onClick = onValue) { Icon(Icons.Filled.Paid, "Collection value") }
                     IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats") }
                     IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
                 },
@@ -263,6 +266,9 @@ private fun FilterRow(vm: CollectionViewModel, cards: List<Card>) {
     ) {
         if (vm.anyFilter) {
             TextButton(onClick = { vm.clearFilters() }) { Text("Clear") }
+        }
+        if (vm.noValue) {
+            FilterChip(selected = true, onClick = { vm.noValue = false }, label = { Text("No value") })
         }
         val toReview = cards.count { it.needsReview }
         if (toReview > 0 || vm.needsReview) {

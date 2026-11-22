@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +56,7 @@ fun StatsScreen(
     onBack: () -> Unit,
     onOpen: (Long) -> Unit,
     onFilter: ((CollectionViewModel) -> Unit) -> Unit,
+    onValue: () -> Unit,
 ) {
     val context = LocalContext.current
     val repo = remember { (context.applicationContext as Strike3App).repo }
@@ -113,6 +115,7 @@ fun StatsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Button(onClick = onValue, modifier = Modifier.fillMaxWidth()) { Text("Open the value page") }
                     Text("Most valuable", fontWeight = FontWeight.SemiBold)
                     valued.sortedByDescending { it.valueNumber }.take(5).forEach { c ->
                         Row(
@@ -182,7 +185,7 @@ private fun Breakdown(
     if (counts.isEmpty()) return
     val max = counts.maxOf { it.second }.toFloat()
     Section(title) {
-        counts.take(limit).forEach { (label, n) -> BarRow(label, n, n / max) { onPick(label) } }
+        counts.take(limit).forEach { (label, n) -> BarRow(label, n.toString(), n / max) { onPick(label) } }
         if (counts.size > limit) {
             Text("+ ${counts.size - limit} more", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -190,7 +193,7 @@ private fun Breakdown(
 }
 
 @Composable
-private fun BarRow(label: String, count: Int, fraction: Float, onClick: (() -> Unit)?) {
+internal fun BarRow(label: String, amount: String, fraction: Float, onClick: (() -> Unit)?) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
@@ -205,7 +208,7 @@ private fun BarRow(label: String, count: Int, fraction: Float, onClick: (() -> U
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp)),
             )
         }
-        Text(count.toString(), fontWeight = FontWeight.SemiBold, modifier = Modifier.width(32.dp))
+        Text(amount, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(if (amount.length > 4) 72.dp else 32.dp))
     }
 }
 
@@ -220,7 +223,7 @@ private fun AddedByMonth(cards: List<Card>) {
     Section("Added by month") {
         counts.forEach { (m, n) ->
             val label = m.month.getDisplayName(TextStyle.SHORT, Locale.US) + " " + m.year
-            BarRow(label, n, if (n == 0) 0f else n / max, onClick = null)
+            BarRow(label, n.toString(), if (n == 0) 0f else n / max, onClick = null)
         }
     }
 }
