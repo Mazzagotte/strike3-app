@@ -1,6 +1,11 @@
 package dev.mazzagotte.strike3.ui
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.input.pointer.pointerInput
+import dev.mazzagotte.strike3.render.FrameCrop
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,9 +16,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -88,8 +90,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     var error by remember { mutableStateOf<String?>(null) }
 
     var scanning by remember { mutableStateOf<String?>(null) }
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    var chooseScanSource by remember { mutableStateOf(false) }
+    var capturingBack by remember { mutableStateOf(false) }
 
     // Catalog mode: front photo from the camera (turned upright), back photo once added
     val frontThumb by produceState<Bitmap?>(initialValue = null, editor.source, editor.rotation) {
@@ -110,11 +111,11 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
         }
     }
 
-    fun readCard(uri: Uri) {
+    fun readCard(uri: Uri, frame: FrameCrop?) {
         scope.launch {
             scanning = "Reading the card…"
             try {
-                val bmp = withContext(Dispatchers.IO) { PhotoTools.decode(context, uri) }
+                val bmp = loadCardPhoto(context, uri, frame)
                 val guess = CardReader.read(bmp)
                 // Keep the photo as the carousel's back slide
                 val back = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, "back-" + Media.stamp()) }
@@ -127,17 +128,6 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 scanning = "Couldn't read the card: ${e.message}"
             }
         }
-    }
-
-    val takeScan = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        val uri = pendingCameraUri
-        pendingCameraUri = null
-        if (uri != null) {
-            if (ok) readCard(uri) else Media.delete(context, uri)
-        }
-    }
-    val pickScan = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) readCard(uri)
     }
 
     LaunchedEffect(editId) {
@@ -210,10 +200,10 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             if (catalog && editId == null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     PhotoBox("Front", frontThumb, editor.busy, Modifier.weight(1f)) {}
-                    PhotoBox("Back", backThumb, scanning?.takeIf { it.endsWith("…") }, Modifier.weight(1f)) { chooseScanSource = true }
+                    PhotoBox("Back", backThumb, scanning?.takeIf { it.endsWith("…") }, Modifier.weight(1f)) { capturingBack = true }
                 }
             }
-            OutlinedButton(onClick = { chooseScanSource = true }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { capturingBack = true }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.DocumentScanner, contentDescription = null)
                 Text(if (card.backPath == null) "  Add the back (reads the details)" else "  Retake the back")
             }
@@ -265,22 +255,20 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             }
         }
     }
-    if (chooseScanSource) {
-        PhotoSourceDialog(
-            title = "Photo of the card back",
-            onCamera = {
-                chooseScanSource = false
-                Media.newCameraUri(context)?.let { uri ->
-                    pendingCameraUri = uri
-                    takeScan.launch(uri)
-                }
-            },
-            onGallery = {
-                chooseScanSource = false
-                pickScan.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            },
-            onDismiss = { chooseScanSource = false },
-        )
+    // Back photo with the same in-app camera and card guide as the front
+    if (capturingBack) {
+        BackHandler { capturingBack = false }
+        // Covers the details screen and keeps taps from reaching it
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
+            CaptureScreen(
+                onPhoto = { uri, frame ->
+                    capturingBack = false
+                    readCard(uri, frame)
+                },
+                onBack = { capturingBack = false },
+                hint = "Line up the BACK of the card inside the frame. Tap to focus.",
+            )
+        }
     }
 }
 

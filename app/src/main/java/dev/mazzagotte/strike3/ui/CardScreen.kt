@@ -2,6 +2,10 @@ package dev.mazzagotte.strike3.ui
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import dev.mazzagotte.strike3.render.FrameCrop
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -90,6 +94,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
     var chooseFor by remember { mutableStateOf<Slot?>(null) }
     var pendingSlot by remember { mutableStateOf<Slot?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var capturingBack by remember { mutableStateOf(false) }
     var style by remember { mutableStateOf(Captions.defaultStyle(context)) }
 
     /** Runs an export with a progress overlay and friendly errors. */
@@ -108,11 +113,13 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
         }
     }
 
-    fun setSlotPhoto(uri: Uri) {
+    fun setSlotPhoto(uri: Uri, frame: FrameCrop? = null) {
         val slot = pendingSlot ?: return
         pendingSlot = null
         doWork("Adding photo…") { c ->
-            val bmp = withContext(Dispatchers.IO) { PhotoTools.decode(context, uri) }
+            // The back goes through the card guide crop like the front; close-ups stay as shot
+            val bmp = if (slot == Slot.BACK) loadCardPhoto(context, uri, frame)
+            else withContext(Dispatchers.IO) { PhotoTools.decode(context, uri) }
             val path = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, slot.name.lowercase() + "-" + Media.stamp()) }
             val updated = when (slot) {
                 Slot.BACK -> { SourceStore.delete(c.backPath); c.copy(backPath = path) }
@@ -240,7 +247,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SlotTile("Back", c.backPath, Modifier.weight(1f)) { chooseFor = Slot.BACK }
+                    SlotTile("Back", c.backPath, Modifier.weight(1f)) { capturingBack = true }
                     SlotTile("Close-up", c.closeUpPath, Modifier.weight(1f)) { chooseFor = Slot.CLOSE_UP }
                 }
                 Button(
@@ -299,6 +306,21 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
             },
             onDismiss = { chooseFor = null },
         )
+    }
+
+    if (capturingBack) {
+        BackHandler { capturingBack = false }
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
+            CaptureScreen(
+                onPhoto = { uri, frame ->
+                    capturingBack = false
+                    pendingSlot = Slot.BACK
+                    setSlotPhoto(uri, frame)
+                },
+                onBack = { capturingBack = false },
+                hint = "Line up the BACK of the card inside the frame. Tap to focus.",
+            )
+        }
     }
 
     message?.let {

@@ -66,12 +66,22 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.mazzagotte.strike3.render.FrameCrop
+import android.content.Context
+import android.graphics.Bitmap
+import dev.mazzagotte.strike3.render.PhotoTools
+import dev.mazzagotte.strike3.util.CardReader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 @Composable
-fun CaptureScreen(onPhoto: (Uri, FrameCrop?) -> Unit, onBack: () -> Unit) {
+fun CaptureScreen(
+    onPhoto: (Uri, FrameCrop?) -> Unit,
+    onBack: () -> Unit,
+    hint: String = "Line the card up inside the frame. Tap to focus.",
+) {
     val context = LocalContext.current
     var hasCamera by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -83,7 +93,7 @@ fun CaptureScreen(onPhoto: (Uri, FrameCrop?) -> Unit, onBack: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (hasCamera) {
-            CameraWithGuide(onPhoto = onPhoto)
+            CameraWithGuide(onPhoto = onPhoto, hint = hint)
         } else {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
@@ -115,7 +125,7 @@ fun CaptureScreen(onPhoto: (Uri, FrameCrop?) -> Unit, onBack: () -> Unit) {
 }
 
 @Composable
-private fun CameraWithGuide(onPhoto: (Uri, FrameCrop?) -> Unit) {
+private fun CameraWithGuide(onPhoto: (Uri, FrameCrop?) -> Unit, hint: String) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember {
@@ -179,7 +189,7 @@ private fun CameraWithGuide(onPhoto: (Uri, FrameCrop?) -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                error ?: "Line the card up inside the frame. Tap to focus.",
+                error ?: hint,
                 color = Color.White, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
             )
@@ -263,4 +273,17 @@ private fun CardGuide() {
         drawLine(Gold.copy(alpha = .7f), Offset(cx, top - 14.dp.toPx()), Offset(cx, top + 10.dp.toPx()), 2.dp.toPx())
         drawLine(Gold.copy(alpha = .7f), Offset(cx, top + h - 10.dp.toPx()), Offset(cx, top + h + 14.dp.toPx()), 2.dp.toPx())
     }
+}
+
+/**
+ * Opens a photo from the capture screen the same way the post editor does: crop to the guide
+ * (camera) or trim the edges (gallery), then turn it so the printed text reads upright.
+ */
+suspend fun loadCardPhoto(context: Context, uri: Uri, frame: FrameCrop?): Bitmap {
+    val decoded = withContext(Dispatchers.IO) { PhotoTools.decode(context, uri) }
+    val bmp = withContext(Dispatchers.Default) {
+        if (frame != null) PhotoTools.autoTrim(PhotoTools.cropToFrame(decoded, frame)) else PhotoTools.autoTrim(decoded)
+    }
+    val turn = try { CardReader.detectRotation(bmp) } catch (_: Exception) { 0 }
+    return if (turn == 0) bmp else withContext(Dispatchers.Default) { PhotoTools.rotate(bmp, turn) }
 }
