@@ -27,6 +27,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 **Collection log**
 - Player, year, set, parallel, serial, team, auto/rookie/patch, date acquired, price paid, posted, notes
 - Search, plus filters for autos, rookies and not posted
+- Parallel suggestions under the Parallel field (tap to fill): names you've already used for the same set and print run, best match same year, plus the photo's border color as a hint (e.g. "Purple?") when the log has nothing yet. Nothing is filled automatically
 - Serial number entered as two number boxes with the slash built in (049 / 199), so the number pad works
 - Caption styles on each card: **Clean** (player, set line, numbered), **Strike III** (umpire call opener, "joins the Yankees PC") and **Short** (one line). Built only from the logged details, editable before sharing, and the last style you pick is used by every Share button
 

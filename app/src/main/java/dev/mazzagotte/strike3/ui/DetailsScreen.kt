@@ -46,6 +46,11 @@ import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.SourceStore
 import dev.mazzagotte.strike3.util.CardReader
 import dev.mazzagotte.strike3.util.Media
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
+import dev.mazzagotte.strike3.util.ParallelHints
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,6 +80,17 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     var scanning by remember { mutableStateOf<String?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var chooseScanSource by remember { mutableStateOf(false) }
+
+    // For parallel suggestions: your other cards, and the main border color of the front photo.
+    val allCards by remember { repo.cards() }.collectAsState(initial = emptyList())
+    val borderColor by produceState<String?>(initialValue = null, editId, loaded) {
+        if (!loaded) return@produceState
+        value = withContext(Dispatchers.Default) {
+            val photo = if (editId == null) editor.cutoutBitmap ?: editor.source
+            else SourceStore.load(card.cutoutPath ?: card.sourcePath)
+            photo?.let { runCatching { ParallelHints.borderColor(it) }.getOrNull() }
+        }
+    }
 
     fun readCard(uri: Uri) {
         scope.launch {
@@ -170,6 +186,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 Field("Set", card.setName, words = true, modifier = Modifier.weight(0.65f)) { card = card.copy(setName = it) }
             }
             Field("Parallel", card.parallel, words = true) { card = card.copy(parallel = it) }
+            ParallelSuggestions(card, allCards, borderColor) { card = card.copy(parallel = it) }
             SerialField(card.serial, { card = card.copy(serial = it) }, Modifier.fillMaxWidth())
             Field("Team", card.team, words = true) { card = card.copy(team = it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -216,6 +233,29 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             },
             onDismiss = { chooseScanSource = false },
         )
+    }
+}
+
+/**
+ * Tap-to-fill chips under the Parallel field, shown only while it's empty:
+ * names you've used before for this set and print run, then the photo's border color as a hint.
+ */
+@Composable
+private fun ParallelSuggestions(card: Card, all: List<Card>, color: String?, onPick: (String) -> Unit) {
+    if (card.parallel.isNotBlank()) return
+    val fromLog = remember(card.setName, card.year, card.serial, all, color) { ParallelHints.fromLog(card, all, color) }
+    val colorHint = color?.takeIf { c -> fromLog.none { it.contains(c, ignoreCase = true) } }
+    if (fromLog.isEmpty() && colorHint == null) return
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            if (fromLog.isNotEmpty()) "Suggested from your log" else "Border color in the photo",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            fromLog.forEach { name -> SuggestionChip(onClick = { onPick(name) }, label = { Text(name) }) }
+            colorHint?.let { c -> SuggestionChip(onClick = { onPick(c) }, label = { Text("$c?") }) }
+        }
     }
 }
 
