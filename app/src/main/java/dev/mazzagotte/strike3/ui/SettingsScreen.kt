@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.Strike3App
+import dev.mazzagotte.strike3.data.CsvImport
 import dev.mazzagotte.strike3.data.DriveBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -74,6 +75,26 @@ fun SettingsScreen(onBack: () -> Unit) {
                 "Exported ${cards.size} card${if (cards.size == 1) "" else "s"}."
             } catch (e: Exception) {
                 "Couldn't export: ${e.message}"
+            }
+        }
+    }
+    // Bring edits made in Google Sheets / Excel back in
+    var importPlan by remember { mutableStateOf<CsvImport.Plan?>(null) }
+    val importCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                        ?: error("couldn't open the file")
+                }
+                val plan = CsvImport.plan(text, repo.cards().first())
+                if (plan.updated.isEmpty() && plan.added.isEmpty()) {
+                    dialog = "Nothing to change: all ${plan.unchanged} cards already match the file."
+                } else {
+                    importPlan = plan
+                }
+            } catch (e: Exception) {
+                dialog = "Couldn't read that CSV: ${e.message}"
             }
         }
     }
@@ -132,6 +153,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onClick = { exportCsv.launch("strike3-collection-" + java.time.LocalDate.now() + ".csv") },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Export CSV") }
+                Text(
+                    "Edited the spreadsheet? Download it as CSV (in Google Sheets: File › Download › CSV) and import it here. " +
+                        "Rows match their cards by the ID column, so leave that column as is. Rows without an ID become new cards. " +
+                        "Photos and posts aren't changed.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { importCsv.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "*/*")) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Import CSV") }
             }
 
             Section("Photos (Google Photos)") {
@@ -143,6 +174,32 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+    }
+
+    importPlan?.let { plan ->
+        AlertDialog(
+            onDismissRequest = { importPlan = null },
+            title = { Text("Import CSV?") },
+            text = {
+                val parts = listOfNotNull(
+                    "${plan.updated.size} card${if (plan.updated.size == 1) "" else "s"} will be updated".takeIf { plan.updated.isNotEmpty() },
+                    "${plan.added.size} new card${if (plan.added.size == 1) "" else "s"} added (no photos)".takeIf { plan.added.isNotEmpty() },
+                    "${plan.unchanged} unchanged".takeIf { plan.unchanged > 0 },
+                    "${plan.skipped} empty row${if (plan.skipped == 1) "" else "s"} skipped".takeIf { plan.skipped > 0 },
+                )
+                Text(parts.joinToString(", ") + ". Details in the file replace what's in the app.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    importPlan = null
+                    scope.launch {
+                        repo.applyImport(plan)
+                        dialog = "Imported: ${plan.updated.size} updated, ${plan.added.size} added."
+                    }
+                }) { Text("Import") }
+            },
+            dismissButton = { TextButton(onClick = { importPlan = null }) { Text("Cancel") } },
+        )
     }
 
     dialog?.let {

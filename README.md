@@ -19,6 +19,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Current value on each card (price paid is no longer shown). Sort by value; the summary line and Stats show totals.
 - Stats page (chart icon): totals, value and most valuable cards, top players, teams, years, sets, and cards added by month. Tap a row to see those cards.
 - Settings › Export CSV saves the whole collection as a spreadsheet anywhere.
+- Settings › Import CSV brings spreadsheet edits back: rows match cards by the ID column, rows without an ID become new cards (no photos), and you confirm the counts first. Serials are exported as ="1/1" so Sheets and Excel don't turn them into dates.
 
 **Catalog (Add card)**
 - Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.

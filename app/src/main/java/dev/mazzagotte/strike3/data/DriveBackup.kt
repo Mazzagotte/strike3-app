@@ -136,12 +136,15 @@ object DriveBackup {
     /** The collection as a spreadsheet (also used by Settings > Export CSV). */
     fun toCsv(cards: List<Card>): String {
         val header = listOf(
-            "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
+            "ID", "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
             "Current value", "Date acquired", "Posted", "Notes",
         )
         val rows = cards.map { c ->
             listOf(
-                c.player, c.year, c.setName, c.parallel, c.serial, c.team,
+                c.id.toString(), c.player, c.year, c.setName, c.parallel,
+                // ="1/1" so Sheets and Excel keep serials as text instead of turning them into dates
+                if (c.serial.isBlank()) "" else "=\"" + c.serial + "\"",
+                c.team,
                 yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
                 c.valueNumber?.let { v -> if (v % 1.0 == 0.0) v.toLong().toString() else "%.2f".format(v) } ?: c.currentValue,
                 c.dateAcquired, yes(c.posted), c.notes,

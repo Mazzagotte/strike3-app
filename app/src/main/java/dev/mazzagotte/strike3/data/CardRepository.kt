@@ -39,6 +39,13 @@ class CardRepository(private val context: Context) {
         scheduleBackup()
     }
 
+    /** Applies a CSV import: changed cards are replaced in place, new rows are added. */
+    suspend fun applyImport(plan: CsvImport.Plan) {
+        dao.insertAll(plan.updated)
+        plan.added.forEach { dao.insert(it) }
+        scheduleBackup()
+    }
+
     suspend fun restore(cards: List<Card>) {
         dao.insertAll(cards)
         scheduleBackup()
