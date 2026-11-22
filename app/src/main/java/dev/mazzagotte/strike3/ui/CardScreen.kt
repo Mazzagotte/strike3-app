@@ -62,6 +62,13 @@ import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.PostComposer
 import dev.mazzagotte.strike3.render.SourceStore
 import dev.mazzagotte.strike3.util.Media
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import dev.mazzagotte.strike3.util.CaptionStyle
+import dev.mazzagotte.strike3.util.Captions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,6 +89,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
     var chooseFor by remember { mutableStateOf<Slot?>(null) }
     var pendingSlot by remember { mutableStateOf<Slot?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var style by remember { mutableStateOf(Captions.defaultStyle(context)) }
 
     /** Runs an export with a progress overlay and friendly errors. */
     fun doWork(label: String, block: suspend (Card) -> Unit) {
@@ -137,6 +145,9 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
         },
     ) { pad ->
         val c = card ?: return@Scaffold
+        // Rebuilt when the style or card details change; hand edits last until then.
+        val generated = Captions.build(c, style)
+        var captionText by remember(generated) { mutableStateOf(generated) }
         Column(
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -151,18 +162,43 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        val uri = c.postUri ?: return@Button
-                        Media.shareToInstagram(context, Uri.parse(uri), Media.caption(c))
-                        if (!c.posted) scope.launch { repo.update(c.copy(posted = true)) }
-                    },
-                    enabled = c.postUri != null,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Share post") }
-                OutlinedButton(onClick = { Media.copy(context, Media.caption(c)) }, modifier = Modifier.weight(1f)) {
-                    Text("Copy caption")
+            Button(
+                onClick = {
+                    val uri = c.postUri ?: return@Button
+                    Media.shareToInstagram(context, Uri.parse(uri), captionText)
+                    if (!c.posted) scope.launch { repo.update(c.copy(posted = true)) }
+                },
+                enabled = c.postUri != null,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Share post") }
+
+            Section("Caption") {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    CaptionStyle.entries.forEachIndexed { i, s ->
+                        SegmentedButton(
+                            selected = style == s,
+                            onClick = {
+                                style = s
+                                Captions.setDefaultStyle(context, s)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(i, CaptionStyle.entries.size),
+                        ) { Text(s.label) }
+                    }
+                }
+                OutlinedTextField(
+                    value = captionText,
+                    onValueChange = { captionText = it },
+                    minLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Built from the card details. Edits here are used by Share and Copy, but aren't saved.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { Media.copy(context, captionText) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                    Text("  Copy caption")
                 }
             }
 
@@ -174,7 +210,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                     doWork("Making Story…") { card ->
                         val bmp = composer.post(card, 1920)
                         val uri = withContext(Dispatchers.IO) { Media.saveJpeg(context, bmp, "strike3-story-" + Media.stamp()) }
-                        Media.shareToInstagram(context, uri, Media.caption(card))
+                        Media.shareToInstagram(context, uri, captionText)
                     }
                 }
                 ActionRow(Icons.Filled.Storefront, "Listing photo", "Plain white background for selling or trading") {
@@ -204,7 +240,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                             val post = card.postUri?.let(Uri::parse) ?: error("This card has no post yet.")
                             val slide = composer.slide2(card) ?: error("Add a back or close-up photo first.")
                             val slideUri = withContext(Dispatchers.IO) { Media.saveJpeg(context, slide, "strike3-slide2-" + Media.stamp()) }
-                            Media.shareCarousel(context, listOf(post, slideUri), Media.caption(card))
+                            Media.shareCarousel(context, listOf(post, slideUri), captionText)
                             if (!card.posted) repo.update(card.copy(posted = true))
                         }
                     },

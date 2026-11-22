@@ -27,7 +27,8 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 **Collection log**
 - Player, year, set, parallel, serial, team, auto/rookie/patch, date acquired, price paid, posted, notes
 - Search, plus filters for autos, rookies and not posted
-- Ready-made captions with hashtags
+- Serial number entered as two number boxes with the slash built in (049 / 199), so the number pad works
+- Caption styles on each card: **Clean** (player, set line, numbered), **Strike III** (umpire call opener, "joins the Yankees PC") and **Short** (one line). Built only from the logged details, editable before sharing, and the last style you pick is used by every Share button
 
 **Backup**
 - Card log → Google Drive (details and post settings; the private photo copies used for re-editing stay on the phone). Settings › Set up Drive backup creates `strike3-backup.json` (restore file) and `strike3-collection.csv` (opens in Google Sheets). Both are rewritten after every change.

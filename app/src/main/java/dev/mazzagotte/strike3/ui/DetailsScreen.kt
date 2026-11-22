@@ -134,7 +134,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                         cutoutPath = cutoutPath,
                     )
                     val id = repo.add(saved)
-                    if (share) Media.shareToInstagram(context, uri, Media.caption(saved))
+                    if (share) Media.shareToInstagram(context, uri, Media.caption(context, saved))
                     onDone(id)
                 }
             } catch (e: Exception) {
@@ -169,10 +169,8 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 Field("Year", card.year, number = true, modifier = Modifier.weight(0.35f)) { card = card.copy(year = it) }
                 Field("Set", card.setName, words = true, modifier = Modifier.weight(0.65f)) { card = card.copy(setName = it) }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field("Parallel", card.parallel, words = true, modifier = Modifier.weight(0.6f)) { card = card.copy(parallel = it) }
-                Field("Serial (25/50)", card.serial, modifier = Modifier.weight(0.4f)) { card = card.copy(serial = it) }
-            }
+            Field("Parallel", card.parallel, words = true) { card = card.copy(parallel = it) }
+            SerialField(card.serial, { card = card.copy(serial = it) }, Modifier.fillMaxWidth())
             Field("Team", card.team, words = true) { card = card.copy(team = it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(card.isAuto, { card = card.copy(isAuto = !card.isAuto) }, { Text("Auto") })

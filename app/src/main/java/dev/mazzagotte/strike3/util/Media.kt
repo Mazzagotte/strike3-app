@@ -98,30 +98,8 @@ object Media {
         null
     }
 
-    fun caption(card: Card): String {
-        val lines = mutableListOf<String>()
-        val head = listOf(card.year, card.setName).filter { it.isNotBlank() }.joinToString(" ")
-        lines += listOf(card.player.ifBlank { null }, head.ifBlank { null }).filterNotNull().joinToString(" — ")
-        val detail = listOf(card.parallel, card.serial).filter { it.isNotBlank() }.joinToString(" · ")
-        if (detail.isNotBlank()) lines += detail
-        val flags = listOfNotNull(
-            "AUTO".takeIf { card.isAuto },
-            "RC".takeIf { card.isRookie },
-            "RELIC".takeIf { card.isPatch },
-        )
-        if (flags.isNotEmpty()) lines += flags.joinToString(" • ")
-        val tags = listOfNotNull(
-            hashtag(card.player),
-            hashtag(card.team),
-            "#thehobby", "#sportscards", "#baseballcards", "#StrikeIIICards",
-        )
-        return (lines.filter { it.isNotBlank() } + "" + tags.joinToString(" ")).joinToString("\n")
-    }
-
-    private fun hashtag(s: String): String? {
-        val t = s.filter { it.isLetterOrDigit() }
-        return if (t.isBlank()) null else "#$t"
-    }
+    /** Caption in the style last picked on a card (see [Captions]). */
+    fun caption(context: Context, card: Card): String = Captions.build(card, Captions.defaultStyle(context))
 
     fun copy(context: Context, text: String, label: String = "Caption") {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
