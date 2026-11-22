@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.CsvImport
 import dev.mazzagotte.strike3.data.DriveBackup
+import dev.mazzagotte.strike3.data.Xlsx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -78,23 +79,49 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
     }
+    // Excel file with a front and back photo in each row
+    var exporting by remember { mutableStateOf<String?>(null) }
+    val exportXlsx = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            exporting = "Making photos…"
+            dialog = try {
+                val cards = repo.cards().first()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                        Xlsx.write(out, cards) { done, total -> exporting = "Making photos… $done of $total" }
+                    } ?: error("couldn't open the file")
+                }
+                "Exported ${cards.size} card${if (cards.size == 1) "" else "s"} with photos."
+            } catch (e: Exception) {
+                "Couldn't export: ${e.message}"
+            } finally {
+                exporting = null
+            }
+        }
+    }
+
     // Bring edits made in Google Sheets / Excel back in
     var importPlan by remember { mutableStateOf<CsvImport.Plan?>(null) }
     val importCsv = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             try {
-                val text = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                val rows = withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: error("couldn't open the file")
+                    // Excel file or CSV, whichever was picked
+                    if (Xlsx.looks(bytes)) Xlsx.readRows(bytes.inputStream())
+                    else CsvImport.parse(bytes.toString(Charsets.UTF_8))
                 }
-                val plan = CsvImport.plan(text, repo.cards().first())
+                val plan = CsvImport.planRows(rows, repo.cards().first())
                 if (plan.updated.isEmpty() && plan.added.isEmpty()) {
                     dialog = "Nothing to change: all ${plan.unchanged} cards already match the file."
                 } else {
                     importPlan = plan
                 }
             } catch (e: Exception) {
-                dialog = "Couldn't read that CSV: ${e.message}"
+                dialog = "Couldn't read that file: ${e.message}"
             }
         }
     }
@@ -145,24 +172,36 @@ fun SettingsScreen(onBack: () -> Unit) {
 
             Section("Export") {
                 Text(
-                    "Save the whole collection as a spreadsheet (CSV) anywhere: Downloads, Drive, or send it on. " +
-                        "Opens in Google Sheets or Excel.",
+                    "Save the whole collection as a spreadsheet anywhere: Downloads, Drive, or send it on. " +
+                        "The Excel file has a small front and back photo in every row and opens in Excel or Google Sheets.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
+                    onClick = { exportXlsx.launch("strike3-collection-" + java.time.LocalDate.now() + ".xlsx") },
+                    enabled = exporting == null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(exporting ?: "Export Excel with photos") }
+                OutlinedButton(
                     onClick = { exportCsv.launch("strike3-collection-" + java.time.LocalDate.now() + ".csv") },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Export CSV") }
+                ) { Text("Export CSV (no photos)") }
                 Text(
-                    "Edited the spreadsheet? Download it as CSV (in Google Sheets: File › Download › CSV) and import it here. " +
+                    "Edited the spreadsheet? Import the Excel file or a CSV here (from Google Sheets: File › Download › Microsoft Excel or CSV). " +
                         "Rows match their cards by the ID column, so leave that column as is. Rows without an ID become new cards. " +
                         "Photos and posts aren't changed.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedButton(
-                    onClick = { importCsv.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "*/*")) },
+                    onClick = {
+                        importCsv.launch(
+                            arrayOf(
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                "text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "*/*",
+                            ),
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import CSV") }
+                ) { Text("Import spreadsheet (Excel or CSV)") }
             }
 
             Section("Photos (Google Photos)") {

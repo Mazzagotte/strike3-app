@@ -94,7 +94,7 @@ fun ValueScreen(
                         Text("Show the $unpriced unpriced card${if (unpriced == 1) "" else "s"}")
                     }
                     Text(
-                        "Pricing a lot at once is quicker in a spreadsheet: Settings › Export CSV, fill in the Current value column, then Import CSV.",
+                        "Pricing a lot at once is quicker in a spreadsheet: Settings › Export Excel with photos, fill in the Current value column, then Import spreadsheet.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

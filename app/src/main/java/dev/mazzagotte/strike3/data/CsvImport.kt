@@ -16,8 +16,11 @@ object CsvImport {
 
     data class Plan(val updated: List<Card>, val added: List<Card>, val unchanged: Int, val skipped: Int)
 
-    fun plan(text: String, existing: List<Card>): Plan {
-        val rows = parse(text).filter { row -> row.any { it.isNotBlank() } }
+    fun plan(text: String, existing: List<Card>): Plan = planRows(parse(text), existing)
+
+    /** Same as [plan], from rows already split into cells (CSV or Excel). */
+    fun planRows(allRows: List<List<String>>, existing: List<Card>): Plan {
+        val rows = allRows.filter { row -> row.any { it.isNotBlank() } }
         if (rows.isEmpty()) error("the file is empty")
         val header = rows.first().map { it.trim().lowercase() }
         fun col(vararg names: String) = names.firstNotNullOfOrNull { n -> header.indexOf(n).takeIf { it >= 0 } }
@@ -87,6 +90,10 @@ object CsvImport {
 
     /** Keeps 2026-11-21 as is; turns 11/21/2026 (how Sheets often writes dates) into 2026-11-21. */
     private fun isoDate(s: String): String {
+        // Excel stores an edited date as a day count from 1899-12-30
+        s.trim().removeSuffix(".0").toIntOrNull()?.takeIf { it in 20000..80000 }?.let {
+            return LocalDate.of(1899, 12, 30).plusDays(it.toLong()).toString()
+        }
         val m = Regex("""^(\d{1,2})/(\d{1,2})/(\d{2,4})$""").find(s.trim()) ?: return s
         val (mo, d, y) = m.destructured
         val year = if (y.length == 2) "20$y" else y
