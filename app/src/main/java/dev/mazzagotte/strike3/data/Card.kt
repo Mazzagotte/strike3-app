@@ -1,7 +1,6 @@
 package dev.mazzagotte.strike3.data
 
 import android.content.Context
-import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Delete
@@ -47,9 +46,9 @@ data class Card(
     val backPath: String? = null,
     val closeUpPath: String? = null,
     /** What the card is worth now, as typed ("45", "$1,200"). Replaces price paid in the app. */
-    @ColumnInfo(defaultValue = "") val currentValue: String = "",
+    val currentValue: String = "",
     /** Added in a batch and the details haven't been checked yet. */
-    @ColumnInfo(defaultValue = "0") val needsReview: Boolean = false,
+    val needsReview: Boolean = false,
 ) {
     val title: String
         get() = player.ifBlank { "Untitled card" }
