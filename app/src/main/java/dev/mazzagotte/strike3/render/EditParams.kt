@@ -87,6 +87,16 @@ object SourceStore {
         return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inMutable = true })
     }
 
+    /** Smaller copy for thumbnails (decodes at roughly [maxSide] instead of full size). */
+    fun loadScaled(path: String?, maxSide: Int): Bitmap? {
+        if (path.isNullOrBlank() || !File(path).exists()) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+        return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
     fun delete(path: String?) {
         if (!path.isNullOrBlank()) File(path).delete()
     }

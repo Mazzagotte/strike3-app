@@ -1,6 +1,16 @@
 package dev.mazzagotte.strike3.ui
 
 import android.net.Uri
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,7 +68,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit, onBack: () -> Unit, catalog: Boolean = false) {
     val context = LocalContext.current
     val repo = (context.applicationContext as Strike3App).repo
     val scope = rememberCoroutineScope()
@@ -81,6 +91,14 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var chooseScanSource by remember { mutableStateOf(false) }
 
+    // Catalog mode: front photo from the camera (turned upright), back photo once added
+    val frontThumb by produceState<Bitmap?>(initialValue = null, editor.source, editor.rotation) {
+        value = editor.source?.let { src -> withContext(Dispatchers.Default) { PhotoTools.rotate(src, editor.rotation) } }
+    }
+    val backThumb by produceState<Bitmap?>(initialValue = null, card.backPath) {
+        value = withContext(Dispatchers.IO) { SourceStore.loadScaled(card.backPath, 800) }
+    }
+
     // For parallel suggestions: your other cards, and the main border color of the front photo.
     val allCards by remember { repo.cards() }.collectAsState(initial = emptyList())
     val borderColor by produceState<String?>(initialValue = null, editId, loaded) {
@@ -100,7 +118,9 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 val guess = CardReader.read(bmp)
                 // Keep the photo as the carousel's back slide
                 val back = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, "back-" + Media.stamp()) }
-                card = CardReader.merge(card, guess).copy(backPath = card.backPath ?: back)
+                val old = card.backPath
+                card = CardReader.merge(card, guess).copy(backPath = back)
+                if (editId == null) SourceStore.delete(old) // a saved card keeps its old file until you save
                 scanning = if (guess.found.isEmpty()) "Couldn't read any details. Try a sharper, closer photo of the back."
                 else "Filled in: " + guess.found.joinToString(", ") + ". Check them before saving."
             } catch (e: Exception) {
@@ -136,6 +156,20 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 if (editId != null) {
                     repo.update(card)
                     onDone(editId)
+                } else if (catalog) {
+                    // Collection only: keep the front photo (and the editor settings, so the post can be made later)
+                    val name = "strike3-" + (card.player.filter { it.isLetterOrDigit() }.ifBlank { "card" }) + "-" + Media.stamp()
+                    editor.badges = listOfNotNull("AUTO".takeIf { card.isAuto }, "RELIC".takeIf { card.isPatch }, "RC".takeIf { card.isRookie }).toSet()
+                    editor.serialBadge = card.serial.trim()
+                    val (sourcePath, cutoutPath) = editor.saveSources(name)
+                    val saved = card.copy(
+                        postUri = null,
+                        originalUri = editor.originalUri?.toString(),
+                        editParams = editor.currentEditParams().toJson(),
+                        sourcePath = sourcePath,
+                        cutoutPath = cutoutPath,
+                    )
+                    onDone(repo.add(saved))
                 } else {
                     val post = editor.renderFinal()
                     val name = "strike3-" + (card.player.filter { it.isLetterOrDigit() }.ifBlank { "card" }) + "-" + Media.stamp()
@@ -163,7 +197,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (editId == null) "Card details" else "Edit card") },
+                title = { Text(if (editId != null) "Edit card" else if (catalog) "Add card" else "Card details") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
             )
         },
@@ -173,9 +207,15 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (catalog && editId == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PhotoBox("Front", frontThumb, editor.busy, Modifier.weight(1f)) {}
+                    PhotoBox("Back", backThumb, scanning?.takeIf { it.endsWith("…") }, Modifier.weight(1f)) { chooseScanSource = true }
+                }
+            }
             OutlinedButton(onClick = { chooseScanSource = true }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.DocumentScanner, contentDescription = null)
-                Text("  Read details from the card back")
+                Text(if (card.backPath == null) "  Add the back (reads the details)" else "  Retake the back")
             }
             scanning?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -203,7 +243,15 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
 
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            if (editId == null) {
+            if (editId == null && catalog) {
+                Button(
+                    onClick = { save(share = false) },
+                    enabled = !saving && editor.busy == null,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                ) {
+                    Text(if (saving) "Saving…" else if (editor.busy != null) "Loading photo…" else "Save to collection")
+                }
+            } else if (editId == null) {
                 Button(onClick = { save(share = true) }, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
                     Text(if (saving) "Saving…" else "Save & share to Instagram")
                 }
@@ -281,4 +329,19 @@ private fun Field(
         ),
         modifier = modifier,
     )
+}
+
+/** Photo tile for the Add card screen. Tap to add or retake (when [onClick] does something). */
+@Composable
+private fun PhotoBox(label: String, bmp: Bitmap?, busy: String?, modifier: Modifier, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = modifier.aspectRatio(0.72f), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(6.dp)) {
+        when {
+            busy != null -> CircularProgressIndicator()
+            bmp != null -> Image(bmp.asImageBitmap(), contentDescription = label, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Filled.AddAPhoto, contentDescription = null)
+                Text("Add $label", modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    }
 }

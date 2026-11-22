@@ -12,10 +12,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 sealed interface Screen {
     data object Collection : Screen
-    data object Capture : Screen
+    /** catalog: shoot the front for the collection only, no post yet. */
+    data class Capture(val catalog: Boolean = false) : Screen
     data object Editor : Screen
-    /** editId == null: new card from the post just made. */
-    data class Details(val editId: Long?) : Screen
+    /** editId == null: new card, from the post just made or (catalog) from the front photo only. */
+    data class Details(val editId: Long?, val catalog: Boolean = false) : Screen
     data class CardView(val id: Long) : Screen
     data object Settings : Screen
 }
@@ -43,14 +44,15 @@ fun AppRoot(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (val s = nav.current) {
             Screen.Collection -> CollectionScreen(
-                onNewPost = { nav.go(Screen.Capture) },
+                onNewPost = { nav.go(Screen.Capture()) },
+                onAddCard = { nav.go(Screen.Capture(catalog = true)) },
                 onOpen = { nav.go(Screen.CardView(it)) },
                 onSettings = { nav.go(Screen.Settings) },
             )
-            Screen.Capture -> CaptureScreen(
+            is Screen.Capture -> CaptureScreen(
                 onPhoto = { uri, frame ->
                     editor.load(uri, frame)
-                    nav.go(Screen.Editor)
+                    nav.go(if (s.catalog) Screen.Details(null, catalog = true) else Screen.Editor)
                 },
                 onBack = nav::back,
             )
@@ -62,6 +64,7 @@ fun AppRoot(
             )
             is Screen.Details -> DetailsScreen(
                 editId = s.editId,
+                catalog = s.catalog,
                 editor = editor,
                 onDone = { id -> nav.resetTo(Screen.CardView(id)) },
                 onBack = nav::back,

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
@@ -153,7 +154,7 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                UriImage(c.postUri, 1400, Modifier.fillMaxWidth().aspectRatio(1080f / 1350f).clip(RoundedCornerShape(10.dp)))
+                CardImage(c, 1400, Modifier.fillMaxWidth().aspectRatio(1080f / 1350f).clip(RoundedCornerShape(10.dp)))
                 working?.let {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
@@ -162,15 +163,22 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                 }
             }
 
-            Button(
-                onClick = {
-                    val uri = c.postUri ?: return@Button
-                    Media.shareToInstagram(context, Uri.parse(uri), captionText)
-                    if (!c.posted) scope.launch { repo.update(c.copy(posted = true)) }
-                },
-                enabled = c.postUri != null,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Share post") }
+            if (c.postUri == null) {
+                // Cataloged without a post: make one from the saved front photo
+                Button(onClick = { onEditPost(c) }, enabled = c.sourcePath != null || c.originalUri != null, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null)
+                    Text("  Make post")
+                }
+            } else {
+                Button(
+                    onClick = {
+                        val uri = c.postUri ?: return@Button
+                        Media.shareToInstagram(context, Uri.parse(uri), captionText)
+                        if (!c.posted) scope.launch { repo.update(c.copy(posted = true)) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Share post") }
+            }
 
             Section("Caption") {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -203,10 +211,10 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
             }
 
             Section("More") {
-                ActionRow(Icons.Filled.Tune, "Edit post", "Change the tag, position or look", enabled = c.editParams != null) {
+                if (c.postUri != null) ActionRow(Icons.Filled.Tune, "Edit post", "Change the tag, position or look", enabled = c.editParams != null) {
                     onEditPost(c)
                 }
-                ActionRow(Icons.Filled.AutoAwesomeMotion, "Share as Story or Reel cover", "Same post at 9:16") {
+                if (c.postUri != null) ActionRow(Icons.Filled.AutoAwesomeMotion, "Share as Story or Reel cover", "Same post at 9:16") {
                     doWork("Making Story…") { card ->
                         val bmp = composer.post(card, 1920)
                         val uri = withContext(Dispatchers.IO) { Media.saveJpeg(context, bmp, "strike3-story-" + Media.stamp()) }
@@ -224,9 +232,10 @@ fun CardScreen(id: Long, onEdit: () -> Unit, onEditPost: (Card) -> Unit, onBack:
                 }
             }
 
-            Section("Carousel") {
+            Section(if (c.postUri == null) "Back and close-up" else "Carousel") {
                 Text(
-                    "Slide 1 is the post. Slide 2 shows the back and a close-up (serial, auto or relic) side by side.",
+                    if (c.postUri == null) "Tap to add or change the back and a close-up. Once you make the post, they become a carousel slide."
+                    else "Slide 1 is the post. Slide 2 shows the back and a close-up (serial, auto or relic) side by side.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

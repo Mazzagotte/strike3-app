@@ -5,6 +5,11 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 
 ## What it does
 
+**Catalog (Add card)**
+- Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.
+- Make the post later from the card page (**Make post**); it opens the editor with the saved front photo and the card's badges.
+- Cards without a post show their front photo in the collection grid. The **Not posted** filter lists them.
+
 **Post Maker**
 - Camera with a card-shaped guide (or pick a photo from the gallery)
 - Auto cutout with Google's on-device ML Kit, or "shot on black" mode that fades the edges and hides the backdrop

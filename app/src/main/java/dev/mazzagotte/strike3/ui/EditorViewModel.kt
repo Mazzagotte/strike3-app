@@ -240,6 +240,11 @@ class EditorViewModel(app: Application) : AndroidViewModel(app) {
         placement = p.placement
         badges = p.badges.filter { it in BADGE_ORDER }.toSet()
         serialBadge = p.badges.firstOrNull { it !in BADGE_ORDER }.orEmpty()
+        if (card.postUri == null) {
+            // Cataloged without a post: start the badges from the card details
+            badges = listOfNotNull("AUTO".takeIf { card.isAuto }, "RELIC".takeIf { card.isPatch }, "RC".takeIf { card.isRookie }).toSet()
+            serialBadge = card.serial.trim()
+        }
         mode = PhotoMode.BLACK
         viewModelScope.launch {
             busy = "Loading photo…"

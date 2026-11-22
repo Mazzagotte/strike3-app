@@ -83,7 +83,7 @@ fun EditorScreen(vm: EditorViewModel, onNext: () -> Unit, onSavedEdit: () -> Uni
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (editing) "Edit post" else "Make the post") },
+                title = { Text(if (editing && vm.editingCard?.postUri != null) "Edit post" else "Make the post") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
                     TextButton(onClick = primary, enabled = ready) { Text(if (editing) "Save" else "Next") }

@@ -55,6 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.Card
+import dev.mazzagotte.strike3.render.SourceStore
+import dev.mazzagotte.strike3.render.PhotoTools
+import dev.mazzagotte.strike3.render.EditParams
+import androidx.compose.material.icons.filled.LibraryAdd
 import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -63,7 +67,7 @@ private enum class Filter(val label: String) { ALL("All"), AUTOS("Autos"), ROOKI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CollectionScreen(onNewPost: () -> Unit, onOpen: (Long) -> Unit, onSettings: () -> Unit) {
+fun CollectionScreen(onNewPost: () -> Unit, onAddCard: () -> Unit, onOpen: (Long) -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { (context.applicationContext as Strike3App).repo }
     val cardsFlow = remember { repo.cards() }
@@ -93,13 +97,21 @@ fun CollectionScreen(onNewPost: () -> Unit, onOpen: (Long) -> Unit, onSettings: 
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNewPost,
-                icon = { Icon(Icons.Filled.PhotoCamera, null) },
-                text = { Text("New post") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Catalog only: front and back photos plus details, make the post later
+                ExtendedFloatingActionButton(
+                    onClick = onAddCard,
+                    icon = { Icon(Icons.Filled.LibraryAdd, null) },
+                    text = { Text("Add card") },
+                )
+                ExtendedFloatingActionButton(
+                    onClick = onNewPost,
+                    icon = { Icon(Icons.Filled.PhotoCamera, null) },
+                    text = { Text("New post") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -129,7 +141,7 @@ fun CollectionScreen(onNewPost: () -> Unit, onOpen: (Long) -> Unit, onSettings: 
             if (cards.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        "No cards yet. Tap New post to shoot your first card. It's added here when you save the post.",
+                        "No cards yet. Tap Add card to catalog a card (front and back), or New post to make an Instagram post.",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -137,7 +149,7 @@ fun CollectionScreen(onNewPost: () -> Unit, onOpen: (Long) -> Unit, onSettings: 
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
+                    contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 168.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
@@ -151,8 +163,8 @@ fun CollectionScreen(onNewPost: () -> Unit, onOpen: (Long) -> Unit, onSettings: 
 @Composable
 private fun CardTile(card: Card, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick)) {
-        UriImage(
-            uri = card.postUri,
+        CardImage(
+            card = card,
             maxSide = 500,
             modifier = Modifier.fillMaxWidth().aspectRatio(1080f / 1350f).clip(RoundedCornerShape(8.dp)),
         )
@@ -174,6 +186,29 @@ fun UriImage(uri: String?, maxSide: Int, modifier: Modifier = Modifier) {
     Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
         bmp?.let {
             Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } ?: Text("III", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * The post if there is one, otherwise the front photo (for cards cataloged without a post),
+ * turned the way it was set in the editor.
+ */
+@Composable
+fun CardImage(card: Card, maxSide: Int, modifier: Modifier = Modifier) {
+    if (card.postUri != null || card.sourcePath == null) {
+        UriImage(card.postUri, maxSide, modifier)
+        return
+    }
+    val turn = remember(card.editParams) { EditParams.fromJson(card.editParams).rotation }
+    val bmp by produceState<Bitmap?>(initialValue = null, card.sourcePath, turn, maxSide) {
+        value = withContext(Dispatchers.IO) {
+            SourceStore.loadScaled(card.sourcePath, maxSide)?.let { PhotoTools.rotate(it, turn) }
+        }
+    }
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+        bmp?.let {
+            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(8.dp))
         } ?: Text("III", color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
     }
 }
