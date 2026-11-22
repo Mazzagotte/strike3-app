@@ -19,7 +19,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Current value on each card (price paid is no longer shown). Sort by value; the summary line and Stats show totals.
 - Stats page (chart icon): totals, value and most valuable cards, top players, teams, years, sets, and cards added by month. Tap a row to see those cards.
 - Value page ($ icon): total worth, how many cards are priced (tap to see the unpriced ones), most valuable cards, value by player, set, team and year, and how much sits in autos, numbered and rookies.
-- Settings › Export Excel with photos: an .xlsx with a small front and back photo in every row (opens in Excel or Google Sheets). Import spreadsheet reads the .xlsx or a CSV back in.
+- Settings › Export Excel with photos: an .xlsx saved to Downloads/Strike III with the front and back photos placed in their cells (Excel for Microsoft 365), then Share or Open. Import spreadsheet reads the .xlsx or a CSV back in.
 - Settings › Export CSV saves the whole collection as a spreadsheet anywhere.
 - Settings › Import CSV brings spreadsheet edits back: rows match cards by the ID column, rows without an ID become new cards (no photos), and you confirm the counts first. Serials are exported as ="1/1" so Sheets and Excel don't turn them into dates.
 
