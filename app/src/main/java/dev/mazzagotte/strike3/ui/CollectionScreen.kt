@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,6 +75,7 @@ import dev.mazzagotte.strike3.render.PhotoTools
 import dev.mazzagotte.strike3.render.SourceStore
 import dev.mazzagotte.strike3.util.Media
 import dev.mazzagotte.strike3.util.SortBy
+import dev.mazzagotte.strike3.util.money
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -85,6 +88,8 @@ fun CollectionScreen(
     vm: CollectionViewModel,
     onNewPost: () -> Unit,
     onAddCard: () -> Unit,
+    onBatch: () -> Unit,
+    onStats: () -> Unit,
     /** Opens a card; [ids] is the current results in order, for swiping between cards. */
     onOpen: (id: Long, ids: List<Long>) -> Unit,
     onSettings: () -> Unit,
@@ -104,6 +109,7 @@ fun CollectionScreen(
 
     var sortMenu by remember { mutableStateOf(false) }
     var viewMenu by remember { mutableStateOf(false) }
+    var chooseAdd by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -145,6 +151,7 @@ fun CollectionScreen(
                             )
                         }
                     }
+                    IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats") }
                     IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }
                 },
             )
@@ -153,7 +160,7 @@ fun CollectionScreen(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Catalog only: front and back photos plus details, make the post later
                 ExtendedFloatingActionButton(
-                    onClick = onAddCard,
+                    onClick = { chooseAdd = true },
                     icon = { Icon(Icons.Filled.LibraryAdd, null) },
                     text = { Text("Add card") },
                 )
@@ -167,6 +174,17 @@ fun CollectionScreen(
             }
         },
     ) { pad ->
+        if (chooseAdd) {
+            AlertDialog(
+                onDismissRequest = { chooseAdd = false },
+                title = { Text("Add cards") },
+                text = {
+                    Text("One card: front, back, then check the details before saving.\n\nBatch: shoot front, back, next card for a whole stack. Each is read and saved as you go, and you finish the details later from the Needs details filter.")
+                },
+                confirmButton = { TextButton(onClick = { chooseAdd = false; onBatch() }) { Text("Batch") } },
+                dismissButton = { TextButton(onClick = { chooseAdd = false; onAddCard() }) { Text("One card") } },
+            )
+        }
         Column(Modifier.padding(pad).fillMaxSize()) {
             OutlinedTextField(
                 value = vm.query,
@@ -246,6 +264,10 @@ private fun FilterRow(vm: CollectionViewModel, cards: List<Card>) {
         if (vm.anyFilter) {
             TextButton(onClick = { vm.clearFilters() }) { Text("Clear") }
         }
+        val toReview = cards.count { it.needsReview }
+        if (toReview > 0 || vm.needsReview) {
+            FilterChip(selected = vm.needsReview, onClick = { vm.needsReview = !vm.needsReview }, label = { Text("Needs details ($toReview)") })
+        }
         FilterChip(selected = vm.autos, onClick = { vm.autos = !vm.autos }, label = { Text("Autos") })
         FilterChip(selected = vm.rookies, onClick = { vm.rookies = !vm.rookies }, label = { Text("Rookies") })
         FilterChip(selected = vm.numbered, onClick = { vm.numbered = !vm.numbered }, label = { Text("Numbered") })
@@ -298,6 +320,7 @@ private fun SummaryLine(shown: List<Card>) {
         "$players player${if (players == 1) "" else "s"}".takeIf { players > 0 },
         shown.count { it.isAuto }.takeIf { it > 0 }?.let { "$it auto${if (it == 1) "" else "s"}" },
         shown.count { it.serial.isNotBlank() }.takeIf { it > 0 }?.let { "$it numbered" },
+        shown.mapNotNull { it.valueNumber }.takeIf { it.isNotEmpty() }?.let { money(it.sum()) },
     )
     Text(
         parts.joinToString(" · "),

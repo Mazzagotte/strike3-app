@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.DriveBackup
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -59,6 +60,21 @@ fun SettingsScreen(onBack: () -> Unit) {
             setUp = true
             // Next: the spreadsheet copy, saved next to it.
             createCsv.launch("strike3-collection.csv")
+        }
+    }
+    // One-off spreadsheet export, saved wherever you pick (Downloads, Drive, …)
+    val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch {
+            dialog = try {
+                val cards = repo.cards().first()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(DriveBackup.toCsv(cards).toByteArray()) }
+                        ?: error("couldn't open the file")
+                }
+                "Exported ${cards.size} card${if (cards.size == 1) "" else "s"}."
+            } catch (e: Exception) {
+                "Couldn't export: ${e.message}"
+            }
         }
     }
     val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -104,6 +120,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                     onClick = { restore.launch(arrayOf("application/json", "application/octet-stream", "*/*")) },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Restore from backup file") }
+            }
+
+            Section("Export") {
+                Text(
+                    "Save the whole collection as a spreadsheet (CSV) anywhere: Downloads, Drive, or send it on. " +
+                        "Opens in Google Sheets or Excel.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = { exportCsv.launch("strike3-collection-" + java.time.LocalDate.now() + ".csv") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Export CSV") }
             }
 
             Section("Photos (Google Photos)") {

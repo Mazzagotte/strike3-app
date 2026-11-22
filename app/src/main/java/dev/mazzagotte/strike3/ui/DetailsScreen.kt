@@ -1,6 +1,14 @@
 package dev.mazzagotte.strike3.ui
 
 import android.net.Uri
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.snapshotFlow
+import dev.mazzagotte.strike3.render.EditParams
+import dev.mazzagotte.strike3.util.Duplicates
+import kotlinx.coroutines.flow.first
+import java.text.DateFormat
+import java.util.Date
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -90,6 +98,11 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
     var error by remember { mutableStateOf<String?>(null) }
 
     var scanning by remember { mutableStateOf<String?>(null) }
+    // What the reader filled in last, so a later reading (the back) can correct it
+    var lastAuto by remember { mutableStateOf<CardReader.Guess?>(null) }
+    var dupOf by remember { mutableStateOf<Card?>(null) }
+    var dupConfirmed by remember { mutableStateOf(false) }
+    var pendingShare by remember { mutableStateOf(false) }
     var capturingBack by remember { mutableStateOf(false) }
 
     // Catalog mode: front photo from the camera (turned upright), back photo once added
@@ -111,22 +124,47 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
         }
     }
 
+    /** The front photo, upright, for reading text. */
+    suspend fun frontPhoto(): Bitmap? = withContext(Dispatchers.Default) {
+        if (editId == null) editor.source?.let { PhotoTools.rotate(it, editor.rotation) }
+        else SourceStore.load(card.sourcePath)?.let { PhotoTools.rotate(it, EditParams.fromJson(card.editParams).rotation) }
+    }
+
     fun readCard(uri: Uri, frame: FrameCrop?) {
         scope.launch {
             scanning = "Reading the card…"
             try {
                 val bmp = loadCardPhoto(context, uri, frame)
-                val guess = CardReader.read(bmp, allCards.map { it.player })
+                // Back and front together: the name and serial are often clearer on one side
+                val guess = CardReader.readBoth(frontPhoto(), bmp, allCards.map { it.player })
                 // Keep the photo as the carousel's back slide
                 val back = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, "back-" + Media.stamp()) }
                 val old = card.backPath
-                card = CardReader.merge(card, guess).copy(backPath = back)
+                card = CardReader.mergeOver(card, lastAuto, guess).copy(backPath = back)
+                lastAuto = guess
                 if (editId == null) SourceStore.delete(old) // a saved card keeps its old file until you save
                 scanning = if (guess.found.isEmpty()) "Couldn't read any details. Try a sharper, closer photo of the back."
                 else "Filled in: " + guess.found.joinToString(", ") + ". Check them before saving."
             } catch (e: Exception) {
                 scanning = "Couldn't read the card: ${e.message}"
             }
+        }
+    }
+
+    // New card: read the front as soon as the photo is ready, before the back is added
+    LaunchedEffect(editId) {
+        if (editId != null) return@LaunchedEffect
+        snapshotFlow { editor.source != null && editor.busy == null }.first { it }
+        if (card.backPath != null || lastAuto != null) return@LaunchedEffect
+        try {
+            val guess = CardReader.readBoth(frontPhoto(), null, repo.cards().first().map { it.player })
+            if (guess.found.isNotEmpty() && card.backPath == null) {
+                card = CardReader.mergeOver(card, null, guess)
+                lastAuto = guess
+                scanning = "From the front: " + guess.found.joinToString(", ") + ". Add the back to fill in more."
+            }
+        } catch (_: Exception) {
+            // Reading the front is a bonus; the back can still be added
         }
     }
 
@@ -139,6 +177,11 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
 
     fun save(share: Boolean) {
         if (saving) return
+        // Already logged? Ask first (once)
+        if (!dupConfirmed) {
+            Duplicates.find(card, allCards)?.let { dupOf = it; pendingShare = share; return }
+        }
+        card = card.copy(needsReview = false)
         saving = true
         error = null
         scope.launch {
@@ -226,7 +269,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field("Date acquired", card.dateAcquired, modifier = Modifier.weight(0.55f)) { card = card.copy(dateAcquired = it) }
-                Field("Price paid", card.pricePaid, number = true, modifier = Modifier.weight(0.45f)) { card = card.copy(pricePaid = it) }
+                Field("Current value ($)", card.currentValue, number = true, modifier = Modifier.weight(0.45f)) { card = card.copy(currentValue = it) }
             }
             Field("Notes", card.notes, singleLine = false) { card = card.copy(notes = it) }
             LabeledSwitch("Posted to Instagram", card.posted) { card = card.copy(posted = it) }
@@ -255,6 +298,26 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             }
         }
     }
+    dupOf?.let { d ->
+        AlertDialog(
+            onDismissRequest = { dupOf = null },
+            title = { Text("Already in your collection?") },
+            text = {
+                val what = listOf(d.title, d.subtitle, d.serial).filter { it.isNotBlank() }.joinToString(" ")
+                val added = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(d.createdAt))
+                Text("You logged $what on $added. Save this one too?")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    dupOf = null
+                    dupConfirmed = true
+                    save(pendingShare)
+                }) { Text("Save anyway") }
+            },
+            dismissButton = { TextButton(onClick = { dupOf = null }) { Text("Cancel") } },
+        )
+    }
+
     // Back photo with the same in-app camera and card guide as the front
     if (capturingBack) {
         BackHandler { capturingBack = false }

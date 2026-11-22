@@ -39,17 +39,63 @@ object CardReader {
     }
 
     /** [known]: player names already in your collection; a match on the card wins over the plain guess. */
-    suspend fun read(bmp: Bitmap, known: List<String> = emptyList()): Guess {
+    suspend fun read(bmp: Bitmap, known: List<String> = emptyList()): Guess = readBoth(null, bmp, known)
+
+    /** Text lines on a photo, top of the card first. */
+    suspend fun lines(bmp: Bitmap): List<String> {
         val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
             val text = client.process(InputImage.fromBitmap(bmp, 0)).await()
-            val lines = text.textBlocks.flatMap { b -> b.lines.map { it.text.trim() } }.filter { it.isNotBlank() }
-            val guess = parse(lines)
-            val match = KnownNames.find(lines, known)
-            return if (match != null) guess.copy(player = match) else guess
+            return text.textBlocks.flatMap { b -> b.lines.map { it.text.trim() } }.filter { it.isNotBlank() }
         } finally {
             client.close()
         }
+    }
+
+    /**
+     * Reads the front and/or the back and combines them. The back is better for year, set and
+     * copyright text; the front often has the serial stamp and the name in big print.
+     * Player name, best first: one of your logged players found on either side, a name both
+     * sides agree on, the back's guess, then the front's.
+     */
+    suspend fun readBoth(front: Bitmap?, back: Bitmap?, known: List<String> = emptyList()): Guess {
+        val frontLines = front?.let { runCatching { lines(it) }.getOrNull() }.orEmpty()
+        val backLines = back?.let { runCatching { lines(it) }.getOrNull() }.orEmpty()
+        val f = parse(frontLines)
+        val b = parse(backLines)
+        val agreed = f.player.takeIf { it.isNotBlank() && it.equals(b.player, ignoreCase = true) }
+        val player = KnownNames.find(backLines, known)
+            ?: KnownNames.find(frontLines, known)
+            ?: agreed
+            ?: b.player.ifBlank { f.player }
+        return Guess(
+            player = player,
+            year = b.year.ifBlank { f.year },
+            setName = b.setName.ifBlank { f.setName },
+            serial = b.serial.ifBlank { f.serial },
+            team = b.team.ifBlank { f.team },
+            isAuto = b.isAuto || f.isAuto,
+            isRookie = b.isRookie || f.isRookie,
+        )
+    }
+
+    /**
+     * Like [merge], but a field the reader filled in last time ([before]) can be replaced by a
+     * newer reading, so the back can correct a guess made from the front alone. Anything you
+     * typed yourself is never overwritten.
+     */
+    fun mergeOver(card: Card, before: Guess?, g: Guess): Card {
+        fun pick(current: String, old: String?, new: String) =
+            if (new.isNotBlank() && (current.isBlank() || current == old)) new else current
+        return card.copy(
+            player = pick(card.player, before?.player, g.player),
+            year = pick(card.year, before?.year, g.year),
+            setName = pick(card.setName, before?.setName, g.setName),
+            serial = pick(card.serial, before?.serial, g.serial),
+            team = pick(card.team, before?.team, g.team),
+            isAuto = card.isAuto || g.isAuto,
+            isRookie = card.isRookie || g.isRookie,
+        )
     }
 
     /**

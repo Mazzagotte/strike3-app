@@ -97,6 +97,8 @@ object DriveBackup {
                     put("isPatch", card.isPatch)
                     put("dateAcquired", card.dateAcquired)
                     put("pricePaid", card.pricePaid)
+                    put("currentValue", card.currentValue)
+                    put("needsReview", card.needsReview)
                     put("posted", card.posted)
                     put("notes", card.notes)
                     put("postUri", card.postUri ?: JSONObject.NULL)
@@ -121,6 +123,8 @@ object DriveBackup {
         isPatch = o.optBoolean("isPatch"),
         dateAcquired = o.optString("dateAcquired"),
         pricePaid = o.optString("pricePaid"),
+        currentValue = o.optString("currentValue"),
+        needsReview = o.optBoolean("needsReview"),
         posted = o.optBoolean("posted"),
         notes = o.optString("notes"),
         postUri = if (o.isNull("postUri")) null else o.optString("postUri"),
@@ -129,16 +133,18 @@ object DriveBackup {
         editParams = if (o.isNull("editParams")) null else o.optString("editParams"),
     )
 
-    private fun toCsv(cards: List<Card>): String {
+    /** The collection as a spreadsheet (also used by Settings > Export CSV). */
+    fun toCsv(cards: List<Card>): String {
         val header = listOf(
             "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
-            "Date acquired", "Price paid", "Posted", "Notes",
+            "Current value", "Date acquired", "Posted", "Notes",
         )
         val rows = cards.map { c ->
             listOf(
                 c.player, c.year, c.setName, c.parallel, c.serial, c.team,
                 yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
-                c.dateAcquired, c.pricePaid, yes(c.posted), c.notes,
+                c.valueNumber?.let { v -> if (v % 1.0 == 0.0) v.toLong().toString() else "%.2f".format(v) } ?: c.currentValue,
+                c.dateAcquired, yes(c.posted), c.notes,
             )
         }
         return (listOf(header) + rows).joinToString("\r\n") { row -> row.joinToString(",") { csv(it) } }

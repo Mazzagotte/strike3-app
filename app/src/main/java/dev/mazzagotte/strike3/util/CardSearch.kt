@@ -10,6 +10,7 @@ enum class SortBy(val label: String) {
     PLAYER("Player A–Z"),
     YEAR("Year, newest first"),
     PRINT_RUN("Print run, lowest first"),
+    VALUE("Value, highest first"),
 }
 
 /**
@@ -35,6 +36,7 @@ object CardSearch {
             "numbered", "serial", "serialized" -> if (card.serial.isNotBlank()) return true
             "1/1", "1of1", "oneofone" -> if (isOneOfOne(card)) return true
             "posted" -> if (card.posted) return true
+            "review", "unchecked", "needs" -> if (card.needsReview) return true
         }
         // "/99" = print run of 99
         if (w.startsWith("/") && w.length > 1 && w.drop(1).all { it.isDigit() }) {
@@ -65,6 +67,9 @@ object CardSearch {
         )
         SortBy.YEAR -> cards.sortedWith(
             compareBy<Card> { it.year.isBlank() }.thenByDescending { it.year }.thenBy { it.player.lowercase() },
+        )
+        SortBy.VALUE -> cards.sortedWith(
+            compareByDescending<Card> { it.valueNumber ?: -1.0 }.thenByDescending { it.createdAt },
         )
         SortBy.PRINT_RUN -> cards.sortedWith(
             compareBy<Card> { printRun(it).toIntOrNull() ?: Int.MAX_VALUE }.thenByDescending { it.createdAt },

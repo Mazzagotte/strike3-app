@@ -1,6 +1,7 @@
 package dev.mazzagotte.strike3.data
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Delete
@@ -45,9 +46,17 @@ data class Card(
     /** Carousel slide 2 photos (app-private) */
     val backPath: String? = null,
     val closeUpPath: String? = null,
+    /** What the card is worth now, as typed ("45", "$1,200"). Replaces price paid in the app. */
+    @ColumnInfo(defaultValue = "") val currentValue: String = "",
+    /** Added in a batch and the details haven't been checked yet. */
+    @ColumnInfo(defaultValue = "0") val needsReview: Boolean = false,
 ) {
     val title: String
         get() = player.ifBlank { "Untitled card" }
+
+    /** [currentValue] as a number, or null when blank or unreadable. */
+    val valueNumber: Double?
+        get() = currentValue.filter { it.isDigit() || it == '.' }.toDoubleOrNull()
 
     val subtitle: String
         get() = listOf(year, setName, parallel).filter { it.isNotBlank() }.joinToString(" ")
@@ -80,7 +89,7 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 2, exportSchema = false)
+@Database(entities = [Card::class], version = 3, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
@@ -93,9 +102,16 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN currentValue TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE cards ADD COLUMN needsReview INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): AppDb =
             Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

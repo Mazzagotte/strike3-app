@@ -12,6 +12,14 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - View: 2 or 3 columns or a list, card front photos or posts, and grouping by player with counts. A summary line shows cards, players, autos and numbered for what's on screen. Search and filters stay put when you open a card and come back.
 - Card page: swipe left/right through the current results, Front / Back / Post views, tap to flip, pinch to zoom, double-tap to reset, and "All N player cards" to jump back to that player's cards.
 
+**Batch add, stats and export**
+- Add card › Batch: shoot front, back, next card for a whole stack. Each card is read (front and back) and saved in the background, marked **Needs details**. Finish them later from the Needs details filter; the card page has a Finish details button.
+- The reader reads the front as well as the back. A player already in your collection found on either side wins, then a name both sides agree on. A later reading can replace what the reader guessed earlier, but never what you typed.
+- Duplicate check: saving a card with the same player, year, set, parallel and serial as one you already have asks first.
+- Current value on each card (price paid is no longer shown). Sort by value; the summary line and Stats show totals.
+- Stats page (chart icon): totals, value and most valuable cards, top players, teams, years, sets, and cards added by month. Tap a row to see those cards.
+- Settings › Export CSV saves the whole collection as a spreadsheet anywhere.
+
 **Catalog (Add card)**
 - Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.
 - The back reader checks the text against every player name already in your collection (allowing small misreads and names split over two lines), so it gets better the more you catalog. Fix a wrong name once and it's learned.

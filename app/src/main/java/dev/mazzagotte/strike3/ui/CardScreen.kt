@@ -2,6 +2,8 @@ package dev.mazzagotte.strike3.ui
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.material3.Surface
+import dev.mazzagotte.strike3.util.money
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -201,6 +203,15 @@ fun CardScreen(
                 }
             }
 
+            if (c.needsReview) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Added in a batch. Check what the reader filled in and add the rest.", style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("Finish details") }
+                    }
+                }
+            }
+
             val player = c.player.trim()
             if (player.isNotEmpty()) {
                 val count = allCards.count { it.player.trim().equals(player, ignoreCase = true) }
@@ -321,7 +332,7 @@ fun CardScreen(
                     listOfNotNull("Auto".takeIf { c.isAuto }, "Rookie".takeIf { c.isRookie }, "Relic".takeIf { c.isPatch }).joinToString(", "),
                 )
                 Detail("Date acquired", c.dateAcquired)
-                Detail("Price paid", c.pricePaid)
+                Detail("Current value", c.valueNumber?.let { money(it) } ?: c.currentValue)
                 Detail("Posted", if (c.posted) "Yes" else "Not yet")
                 Detail("Notes", c.notes)
             }

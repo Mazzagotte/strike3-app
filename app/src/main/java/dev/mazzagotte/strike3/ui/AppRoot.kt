@@ -20,6 +20,8 @@ sealed interface Screen {
     /** [ids]: the collection results it was opened from, for swiping between cards. */
     data class CardView(val id: Long, val ids: List<Long> = listOf(id)) : Screen
     data object Settings : Screen
+    data object Batch : Screen
+    data object Stats : Screen
 }
 
 class NavViewModel : ViewModel() {
@@ -43,6 +45,7 @@ fun AppRoot(
     nav: NavViewModel = viewModel(),
     editor: EditorViewModel = viewModel(),
     collection: CollectionViewModel = viewModel(),
+    batch: BatchViewModel = viewModel(),
 ) {
     BackHandler(enabled = nav.canGoBack) { nav.back() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -50,6 +53,11 @@ fun AppRoot(
             Screen.Collection -> CollectionScreen(
                 onNewPost = { nav.go(Screen.Capture()) },
                 onAddCard = { nav.go(Screen.Capture(catalog = true)) },
+                onBatch = {
+                    batch.start()
+                    nav.go(Screen.Batch)
+                },
+                onStats = { nav.go(Screen.Stats) },
                 vm = collection,
                 onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
                 onSettings = { nav.go(Screen.Settings) },
@@ -73,6 +81,28 @@ fun AppRoot(
                 editor = editor,
                 onDone = { id -> nav.resetTo(Screen.CardView(id)) },
                 onBack = nav::back,
+            )
+            Screen.Batch -> BatchScreen(
+                vm = batch,
+                onDone = { added ->
+                    // Show what still needs details
+                    if (added > 0) {
+                        collection.clearFilters()
+                        collection.query = ""
+                        collection.needsReview = true
+                    }
+                    nav.resetTo(Screen.Collection)
+                },
+            )
+            Screen.Stats -> StatsScreen(
+                onBack = nav::back,
+                onOpen = { id -> nav.go(Screen.CardView(id)) },
+                onFilter = { apply ->
+                    collection.clearFilters()
+                    collection.query = ""
+                    apply(collection)
+                    nav.resetTo(Screen.Collection)
+                },
             )
             is Screen.CardView -> CardPagerScreen(
                 ids = s.ids,
