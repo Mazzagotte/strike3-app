@@ -69,13 +69,11 @@ fun SettingsScreen(onBack: () -> Unit) {
         if (uri != null) scope.launch {
             dialog = try {
                 val cards = repo.cards().first()
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(DriveBackup.toCsv(cards).toByteArray()) }
-                        ?: error("couldn't open the file")
-                }
+                withContext(Dispatchers.IO) { DriveBackup.writeBytes(context, uri, DriveBackup.toCsv(cards).toByteArray()) }
                 "Exported ${cards.size} card${if (cards.size == 1) "" else "s"}."
-            } catch (e: Exception) {
-                "Couldn't export: ${e.message}"
+            } catch (e: Throwable) {
+                discard(context, uri)
+                "Couldn't export: ${e.message ?: e.javaClass.simpleName}"
             }
         }
     }
@@ -88,14 +86,21 @@ fun SettingsScreen(onBack: () -> Unit) {
             exporting = "Making photos…"
             dialog = try {
                 val cards = repo.cards().first()
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
-                        Xlsx.write(out, cards) { done, total -> exporting = "Making photos… $done of $total" }
-                    } ?: error("couldn't open the file")
+                val size = withContext(Dispatchers.IO) {
+                    // Build the whole file first, so a problem can't leave a half-written file behind
+                    val bytes = java.io.ByteArrayOutputStream().also { buf ->
+                        Xlsx.write(buf, cards) { done, total ->
+                            scope.launch { exporting = "Making photos… $done of $total" }
+                        }
+                    }.toByteArray()
+                    if (!Xlsx.looks(bytes)) error("the file came out empty")
+                    DriveBackup.writeBytes(context, uri, bytes)
+                    bytes.size
                 }
-                "Exported ${cards.size} card${if (cards.size == 1) "" else "s"} with photos."
-            } catch (e: Exception) {
-                "Couldn't export: ${e.message}"
+                "Exported ${cards.size} card${if (cards.size == 1) "" else "s"} with photos (${"%.1f".format(size / 1_048_576.0)} MB)."
+            } catch (e: Throwable) {
+                discard(context, uri)
+                "Couldn't export: ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 exporting = null
             }
@@ -248,4 +253,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             text = { Text(it) },
         )
     }
+}
+
+/** Removes an export file that couldn't be written, so an empty file isn't left behind. */
+private fun discard(context: android.content.Context, uri: android.net.Uri) {
+    runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) }
 }

@@ -59,15 +59,19 @@ object DriveBackup {
         return status
     }
 
-    private fun writeText(c: Context, uri: Uri, text: String) {
-        val bytes = text.toByteArray(Charsets.UTF_8)
-        // "wt" truncates; fall back to "w" for providers that don't accept it.
+    private fun writeText(c: Context, uri: Uri, text: String) = writeBytes(c, uri, text.toByteArray(Charsets.UTF_8))
+
+    /**
+     * Writes a whole file in one go. "wt" truncates; falls back to "w" for providers (like Google
+     * Drive on some phones) that don't accept it.
+     */
+    fun writeBytes(c: Context, uri: Uri, bytes: ByteArray) {
         val out = try {
             c.contentResolver.openOutputStream(uri, "wt")
         } catch (_: Exception) {
-            c.contentResolver.openOutputStream(uri, "w")
-        } ?: error("Drive file is unavailable")
-        out.use { it.write(bytes) }
+            null
+        } ?: c.contentResolver.openOutputStream(uri, "w") ?: error("the file is unavailable")
+        out.use { it.write(bytes); it.flush() }
     }
 
     fun readBackup(c: Context, uri: Uri): List<Card> {
