@@ -7,6 +7,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 
 **Catalog (Add card)**
 - Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.
+- The back reader checks the text against every player name already in your collection (allowing small misreads and names split over two lines), so it gets better the more you catalog. Fix a wrong name once and it's learned.
 - Make the post later from the card page (**Make post**); it opens the editor with the saved front photo and the card's badges.
 - Cards without a post show their front photo in the collection grid. The **Not posted** filter lists them.
 

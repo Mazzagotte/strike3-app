@@ -38,12 +38,15 @@ object CardReader {
             )
     }
 
-    suspend fun read(bmp: Bitmap): Guess {
+    /** [known]: player names already in your collection; a match on the card wins over the plain guess. */
+    suspend fun read(bmp: Bitmap, known: List<String> = emptyList()): Guess {
         val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         try {
             val text = client.process(InputImage.fromBitmap(bmp, 0)).await()
             val lines = text.textBlocks.flatMap { b -> b.lines.map { it.text.trim() } }.filter { it.isNotBlank() }
-            return parse(lines)
+            val guess = parse(lines)
+            val match = KnownNames.find(lines, known)
+            return if (match != null) guess.copy(player = match) else guess
         } finally {
             client.close()
         }

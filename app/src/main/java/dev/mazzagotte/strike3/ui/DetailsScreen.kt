@@ -116,7 +116,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             scanning = "Reading the card…"
             try {
                 val bmp = loadCardPhoto(context, uri, frame)
-                val guess = CardReader.read(bmp)
+                val guess = CardReader.read(bmp, allCards.map { it.player })
                 // Keep the photo as the carousel's back slide
                 val back = withContext(Dispatchers.IO) { SourceStore.save(context, bmp, "back-" + Media.stamp()) }
                 val old = card.backPath
