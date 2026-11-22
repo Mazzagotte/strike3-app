@@ -19,12 +19,13 @@ import java.util.zip.ZipOutputStream
  * spreadsheet library is needed.
  *
  * Same columns as the CSV, plus Front and Back photos. The ID column links each row to its card.
+ * Fields the card reader guessed are yellow and listed in the Check column.
  */
 object Xlsx {
 
     private val HEADER = listOf(
         "ID", "Front", "Back", "Player", "Year", "Set", "Parallel", "Serial", "Team",
-        "Auto", "Rookie", "Relic", "Current value", "Date acquired", "Posted", "Notes",
+        "Auto", "Rookie", "Relic", "Current value", "Date acquired", "Posted", "Notes", "Check",
     )
     private const val COL_FRONT = 1
     private const val COL_BACK = 2
@@ -100,16 +101,16 @@ object Xlsx {
         append("</Types>")
     }
 
-    /** Style 0 = normal (top-aligned, wraps), 1 = bold header. */
+    /** Style 0 = normal (top-aligned, wraps), 1 = bold header, 2 = yellow (a guessed field). */
     private const val STYLES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"""
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB3B"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"""
 
     private fun sheet(cards: List<Card>, hasDrawing: Boolean) = buildString {
         append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">""")
         // Keep the header visible while scrolling
         append("""<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>""")
         append("<cols>")
-        val widths = listOf(6, 13, 13, 22, 7, 22, 18, 10, 18, 6, 7, 6, 13, 13, 7, 30)
+        val widths = listOf(6, 13, 13, 22, 7, 22, 18, 10, 18, 6, 7, 6, 13, 13, 7, 30, 14)
         widths.forEachIndexed { i, w -> append("""<col min="${i + 1}" max="${i + 1}" width="$w" customWidth="1"/>""") }
         append("</cols><sheetData>")
         append("""<row r="1">""")
@@ -123,13 +124,19 @@ object Xlsx {
                 c.player, c.year, c.setName, c.parallel, c.serial, c.team,
                 yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
             )
-            values.forEachIndexed { k, v -> if (v.isNotEmpty()) append(textCell(3 + k, r, v)) }
+            // Guessed fields are yellow, like the "Check" column lists them
+            val guessed = listOf("player", "year", "set", "parallel", "serial", "team").map { it in c.unsure }
+            values.forEachIndexed { k, v ->
+                val yellow = guessed.getOrElse(k) { false }
+                if (v.isNotEmpty() || yellow) append(textCell(3 + k, r, v, style = if (yellow) 2 else 0))
+            }
             val value = c.valueNumber
             if (value != null && c.currentValue.trim().all { it.isDigit() || it in "$,. " }) append(numberCell(12, r, value))
             else if (c.currentValue.isNotBlank()) append(textCell(12, r, c.currentValue))
             if (c.dateAcquired.isNotBlank()) append(textCell(13, r, c.dateAcquired))
             append(textCell(14, r, yes(c.posted)))
             if (c.notes.isNotBlank()) append(textCell(15, r, c.notes))
+            if (c.unsureFields.isNotBlank()) append(textCell(16, r, c.unsureFields, style = 2))
             append("</row>")
         }
         append("</sheetData>")

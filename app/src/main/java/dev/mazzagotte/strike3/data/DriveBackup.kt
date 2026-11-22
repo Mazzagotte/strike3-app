@@ -103,6 +103,7 @@ object DriveBackup {
                     put("pricePaid", card.pricePaid)
                     put("currentValue", card.currentValue)
                     put("needsReview", card.needsReview)
+                    put("unsureFields", card.unsureFields)
                     put("posted", card.posted)
                     put("notes", card.notes)
                     put("postUri", card.postUri ?: JSONObject.NULL)
@@ -129,6 +130,7 @@ object DriveBackup {
         pricePaid = o.optString("pricePaid"),
         currentValue = o.optString("currentValue"),
         needsReview = o.optBoolean("needsReview"),
+        unsureFields = o.optString("unsureFields"),
         posted = o.optBoolean("posted"),
         notes = o.optString("notes"),
         postUri = if (o.isNull("postUri")) null else o.optString("postUri"),
@@ -141,7 +143,7 @@ object DriveBackup {
     fun toCsv(cards: List<Card>): String {
         val header = listOf(
             "ID", "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
-            "Current value", "Date acquired", "Posted", "Notes",
+            "Current value", "Date acquired", "Posted", "Notes", "Check",
         )
         val rows = cards.map { c ->
             listOf(
@@ -151,7 +153,7 @@ object DriveBackup {
                 c.team,
                 yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
                 c.valueNumber?.let { v -> if (v % 1.0 == 0.0) v.toLong().toString() else "%.2f".format(v) } ?: c.currentValue,
-                c.dateAcquired, yes(c.posted), c.notes,
+                c.dateAcquired, yes(c.posted), c.notes, c.unsureFields,
             )
         }
         return (listOf(header) + rows).joinToString("\r\n") { row -> row.joinToString(",") { csv(it) } }

@@ -1,6 +1,9 @@
 package dev.mazzagotte.strike3.ui
 
 import android.net.Uri
+import dev.mazzagotte.strike3.util.CardText
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.snapshotFlow
@@ -99,7 +102,7 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
 
     var scanning by remember { mutableStateOf<String?>(null) }
     // What the reader filled in last, so a later reading (the back) can correct it
-    var lastAuto by remember { mutableStateOf<CardReader.Guess?>(null) }
+    var lastAuto by remember { mutableStateOf<CardText.Guess?>(null) }
     var dupOf by remember { mutableStateOf<Card?>(null) }
     var dupConfirmed by remember { mutableStateOf(false) }
     var pendingShare by remember { mutableStateOf(false) }
@@ -144,7 +147,8 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
                 lastAuto = guess
                 if (editId == null) SourceStore.delete(old) // a saved card keeps its old file until you save
                 scanning = if (guess.found.isEmpty()) "Couldn't read any details. Try a sharper, closer photo of the back."
-                else "Filled in: " + guess.found.joinToString(", ") + ". Check them before saving."
+                else "Filled in: " + guess.found.joinToString(", ") + "." +
+                    (if (card.unsure.isNotEmpty()) " Highlighted ones are guesses, check them." else " Check them before saving.")
             } catch (e: Exception) {
                 scanning = "Couldn't read the card: ${e.message}"
             }
@@ -253,15 +257,22 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             scanning?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Field("Player", card.player, words = true) { card = card.copy(player = it) }
+            // Fields the reader guessed are highlighted until you change or confirm them
+            val unsure = card.unsure
+            fun Card.checked(field: String) = withUnsure(unsure - field)
+            Field("Player", card.player, words = true, unsure = CardText.F.PLAYER in unsure) { card = card.copy(player = it).checked(CardText.F.PLAYER) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field("Year", card.year, number = true, modifier = Modifier.weight(0.35f)) { card = card.copy(year = it) }
-                Field("Set", card.setName, words = true, modifier = Modifier.weight(0.65f)) { card = card.copy(setName = it) }
+                Field("Year", card.year, number = true, modifier = Modifier.weight(0.35f), unsure = CardText.F.YEAR in unsure) { card = card.copy(year = it).checked(CardText.F.YEAR) }
+                Field("Set", card.setName, words = true, modifier = Modifier.weight(0.65f), unsure = CardText.F.SET in unsure) { card = card.copy(setName = it).checked(CardText.F.SET) }
             }
-            Field("Parallel", card.parallel, words = true) { card = card.copy(parallel = it) }
-            ParallelSuggestions(card, allCards, borderColor) { card = card.copy(parallel = it) }
-            SerialField(card.serial, { card = card.copy(serial = it) }, Modifier.fillMaxWidth())
-            Field("Team", card.team, words = true) { card = card.copy(team = it) }
+            Field("Parallel", card.parallel, words = true, unsure = CardText.F.PARALLEL in unsure) { card = card.copy(parallel = it).checked(CardText.F.PARALLEL) }
+            ParallelSuggestions(card, allCards, borderColor) { card = card.copy(parallel = it).checked(CardText.F.PARALLEL) }
+            SerialField(card.serial, { card = card.copy(serial = it).checked(CardText.F.SERIAL) }, Modifier.fillMaxWidth())
+            if (CardText.F.SERIAL in unsure) CheckNote("Serial number is a guess, check it")
+            Field("Team", card.team, words = true, unsure = CardText.F.TEAM in unsure) { card = card.copy(team = it).checked(CardText.F.TEAM) }
+            if (unsure.isNotEmpty()) {
+                TextButton(onClick = { card = card.withUnsure(emptySet()) }) { Text("They're all correct") }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(card.isAuto, { card = card.copy(isAuto = !card.isAuto) }, { Text("Auto") })
                 FilterChip(card.isRookie, { card = card.copy(isRookie = !card.isRookie) }, { Text("Rookie") })
@@ -366,12 +377,19 @@ private fun Field(
     words: Boolean = false,
     number: Boolean = false,
     singleLine: Boolean = true,
+    unsure: Boolean = false,
     onChange: (String) -> Unit,
 ) {
+    val check = Color(0xFFFFC107)
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
+        label = { Text(if (unsure) "$label ?" else label) },
+        supportingText = if (unsure) ({ Text("Guessed by the reader, check it") }) else null,
+        colors = if (unsure) OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = check, focusedBorderColor = check, unfocusedLabelColor = check,
+            unfocusedContainerColor = check.copy(alpha = 0.08f), focusedContainerColor = check.copy(alpha = 0.08f),
+        ) else OutlinedTextFieldDefaults.colors(),
         singleLine = singleLine,
         minLines = if (singleLine) 1 else 3,
         keyboardOptions = KeyboardOptions(
@@ -380,6 +398,12 @@ private fun Field(
         ),
         modifier = modifier,
     )
+}
+
+/** Small amber line under a field the reader guessed. */
+@Composable
+private fun CheckNote(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFC107), modifier = Modifier.padding(start = 16.dp))
 }
 
 /** Photo tile for the Add card screen. Tap to add or retake (when [onClick] does something). */

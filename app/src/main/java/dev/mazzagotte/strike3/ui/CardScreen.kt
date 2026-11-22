@@ -203,6 +203,14 @@ fun CardScreen(
                 }
             }
 
+            if (!c.needsReview && c.unsure.isNotEmpty()) {
+                Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("The reader guessed: " + c.unsure.sorted().joinToString(", ") + ". Check them.", style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("Check details") }
+                    }
+                }
+            }
             if (c.needsReview) {
                 Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -321,12 +329,13 @@ fun CardScreen(
             }
 
             Section("Details") {
-                Detail("Player", c.player)
-                Detail("Year", c.year)
-                Detail("Set", c.setName)
-                Detail("Parallel", c.parallel)
-                Detail("Serial", c.serial)
-                Detail("Team", c.team)
+                val u = c.unsure
+                Detail("Player", c.player, "player" in u)
+                Detail("Year", c.year, "year" in u)
+                Detail("Set", c.setName, "set" in u)
+                Detail("Parallel", c.parallel, "parallel" in u)
+                Detail("Serial", c.serial, "serial" in u)
+                Detail("Team", c.team, "team" in u)
                 Detail(
                     "Type",
                     listOfNotNull("Auto".takeIf { c.isAuto }, "Rookie".takeIf { c.isRookie }, "Relic".takeIf { c.isPatch }).joinToString(", "),
@@ -441,10 +450,14 @@ private fun SlotTile(label: String, path: String?, modifier: Modifier, onClick: 
 }
 
 @Composable
-private fun Detail(label: String, value: String) {
+private fun Detail(label: String, value: String, unsure: Boolean = false) {
     if (value.isBlank()) return
     Column {
-        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            if (unsure) label.uppercase() + " · CHECK" else label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (unsure) androidx.compose.ui.graphics.Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, fontWeight = FontWeight.Medium)
         HorizontalDivider(Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outline)
     }

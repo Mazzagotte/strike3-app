@@ -118,14 +118,7 @@ class BatchViewModel(app: Application) : AndroidViewModel(app) {
             SourceStore.save(app, frontBmp, name) to backBmp?.let { SourceStore.save(app, it, "back-" + Media.stamp()) }
         }
         repo.add(
-            Card(
-                player = guess.player,
-                year = guess.year,
-                setName = guess.setName,
-                serial = guess.serial,
-                team = guess.team,
-                isAuto = guess.isAuto,
-                isRookie = guess.isRookie,
+            CardReader.mergeOver(Card(), null, guess).copy(
                 dateAcquired = LocalDate.now().toString(),
                 originalUri = f.first.toString(),
                 // Photos are already turned upright, so no editor settings are needed yet

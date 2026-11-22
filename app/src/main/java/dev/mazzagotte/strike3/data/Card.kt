@@ -49,7 +49,14 @@ data class Card(
     val currentValue: String = "",
     /** Added in a batch and the details haven't been checked yet. */
     val needsReview: Boolean = false,
+    /** Fields the card reader guessed and you haven't checked yet ("year,serial"). */
+    val unsureFields: String = "",
 ) {
+    val unsure: Set<String>
+        get() = unsureFields.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    fun withUnsure(fields: Set<String>) = copy(unsureFields = fields.sorted().joinToString(","))
+
     val title: String
         get() = player.ifBlank { "Untitled card" }
 
@@ -88,7 +95,7 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 3, exportSchema = false)
+@Database(entities = [Card::class], version = 4, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
@@ -108,9 +115,15 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN unsureFields TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDb =
             Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

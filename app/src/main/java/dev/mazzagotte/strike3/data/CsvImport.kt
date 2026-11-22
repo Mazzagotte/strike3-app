@@ -39,6 +39,7 @@ object CsvImport {
         val cDate = col("date acquired")
         val cPosted = col("posted")
         val cNotes = col("notes")
+        val cCheck = col("check")
 
         val byId = existing.associateBy { it.id }
         val updated = mutableListOf<Card>()
@@ -63,6 +64,8 @@ object CsvImport {
                 text(cDate)?.let { c = c.copy(dateAcquired = isoDate(it)) }
                 text(cPosted)?.let { c = c.copy(posted = yes(it)) }
                 text(cNotes)?.let { c = c.copy(notes = it) }
+                // "Check": fields still to double-check; clear the cell once you've checked them
+                text(cCheck)?.let { v -> c = c.withUnsure(v.split(',', ';', ' ').map { it.trim().lowercase() }.filter { it in CHECK_FIELDS }.toSet()) }
                 return c
             }
 
@@ -79,6 +82,8 @@ object CsvImport {
         }
         return Plan(updated, added, unchanged, skipped)
     }
+
+    private val CHECK_FIELDS = setOf("player", "year", "set", "parallel", "serial", "team")
 
     private fun yes(s: String) = s.trim().lowercase() in setOf("yes", "y", "true", "x", "1", "✓", "✔")
 

@@ -23,6 +23,16 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Settings › Export CSV saves the whole collection as a spreadsheet anywhere.
 - Settings › Import CSV brings spreadsheet edits back: rows match cards by the ID column, rows without an ID become new cards (no photos), and you confirm the counts first. Serials are exported as ="1/1" so Sheets and Excel don't turn them into dates.
 
+**Card reader**
+- Reads the "from 2025 Topps Cosmic Chrome Baseball" line on autograph and insert backs for the exact year and set (forgiving of small misreads).
+- Year: ignores birth, draft and debut years and honored designs ("1990 Topps"); uses the copyright line, then the last stats season + 1, then the year mentioned most.
+- Card codes (BCP-139, PD-77, RA-WWA, US325…) name the product and go into Notes.
+- Player name: the line above the team or position line, matched against players already in the collection.
+- Serials must look like a print run (49/199), never a date; the front's foil stamp is preferred.
+- Grading labels (PSA, CCG, BGS, SGC): year, set, card number and grade (into Notes).
+- Parallel from print run + border color (Bowman Chrome /150 + blue = Blue Refractor).
+- Guessed fields are marked: amber "?" on the details screen and card page, yellow in the Excel export, listed in a "Check" column (clear it and import to confirm).
+
 **Catalog (Add card)**
 - Shoot the front with the card guide, add the back (it reads the player, year, set, serial and more), fill in the rest and save to the collection. No post is made.
 - The back reader checks the text against every player name already in your collection (allowing small misreads and names split over two lines), so it gets better the more you catalog. Fix a wrong name once and it's learned.
