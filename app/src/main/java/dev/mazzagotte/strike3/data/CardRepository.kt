@@ -72,6 +72,22 @@ class CardRepository(private val context: Context) {
         }
     }
 
+    /** One time: keep only the print run on numbered cards ("049/199" -> "/199"). */
+    fun printRunsOnly() {
+        val prefs = context.getSharedPreferences("migrations", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("printRuns", false)) return
+        scope.launch {
+            val changed = dao.allNow().mapNotNull { c ->
+                CardText.printRunOnly(c.serial).takeIf { it != c.serial }?.let { c.copy(serial = it) }
+            }
+            if (changed.isNotEmpty()) {
+                dao.insertAll(changed)
+                scheduleBackup()
+            }
+            prefs.edit().putBoolean("printRuns", true).apply()
+        }
+    }
+
     fun scheduleBackup() {
         backupJob?.cancel()
         backupJob = scope.launch {

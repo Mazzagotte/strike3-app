@@ -11,5 +11,6 @@ class Strike3App : Application() {
         super.onCreate()
         repo = CardRepository(this)
         repo.backfillCardNumbers()
+        repo.printRunsOnly()
     }
 }

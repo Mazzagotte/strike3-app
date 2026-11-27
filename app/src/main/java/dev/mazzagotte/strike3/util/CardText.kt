@@ -318,11 +318,26 @@ object CardText {
     private val SERIAL = Regex("""(?<![\d/:.$])(\d{1,4})\s?/\s?(\d{1,4})(?![\d/%])""")
 
     /** "049/199" from a card's text; never a date like 6/30/97 or 9/1/23. */
+    /**
+     * Only the print run matters: "049/199" -> "/199", "199" -> "/199"; one-of-ones stay "1/1".
+     * Empty or unreadable stays as it was.
+     */
+    fun printRunOnly(s: String): String {
+        val t = s.trim()
+        if (t.isEmpty()) return ""
+        val run = (if ('/' in t) t.substringAfter('/') else t).filter { it.isDigit() }.trimStart('0')
+        return when {
+            run.isEmpty() -> t
+            run == "1" -> "1/1"
+            else -> "/$run"
+        }
+    }
+
     fun serial(text: String): String? = SERIAL.findAll(text).map { it.groupValues }.firstOrNull { (_, a, b) ->
         val num = a.toInt(); val den = b.toInt()
         val dateShaped = num in 1..12 && den in 1..31 && den !in setOf(1, 5, 10, 15, 20, 25)
         num in 1..den && den in 1..9999 && !dateShaped
-    }?.let { "${it[1]}/${it[2]}" }
+    }?.let { printRunOnly("${it[1]}/${it[2]}") }
 
     /** "#287", "No. 287", "Card No. 26" -> "287" (only these explicit forms; bare numbers are too often stats). */
     fun plainNumber(text: String): String? =

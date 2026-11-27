@@ -1,5 +1,7 @@
 package dev.mazzagotte.strike3.data
 
+import dev.mazzagotte.strike3.util.CardText
+
 import java.time.LocalDate
 
 /**
@@ -57,7 +59,7 @@ object CsvImport {
                 text(cSet)?.let { c = c.copy(setName = it) }
                 text(cParallel)?.let { c = c.copy(parallel = it) }
                 text(cCard)?.let { c = c.copy(cardNumber = it.uppercase().removePrefix("#").trim()) }
-                text(cSerial)?.let { c = c.copy(serial = it.replace(" ", "")) }
+                text(cSerial)?.let { c = c.copy(serial = CardText.printRunOnly(it.replace(" ", ""))) }
                 text(cTeam)?.let { c = c.copy(team = it) }
                 text(cAuto)?.let { c = c.copy(isAuto = yes(it)) }
                 text(cRookie)?.let { c = c.copy(isRookie = yes(it)) }

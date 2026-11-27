@@ -3,9 +3,8 @@ package dev.mazzagotte.strike3.util
 import dev.mazzagotte.strike3.data.Card
 
 /**
- * Same card already logged: same player, year, set, parallel and serial number
- * (ignoring capitals and extra spaces). A different serial ("042/199" vs "043/199") is a
- * different card. Needs at least a player to compare.
+ * Same card already logged: same player, year, set, parallel and print run
+ * (ignoring capitals and extra spaces). Needs at least a player to compare.
  */
 object Duplicates {
     fun find(card: Card, all: List<Card>): Card? {

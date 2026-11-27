@@ -69,6 +69,7 @@ shoot a card, drop it on the branded post template, log it, and share it to Inst
 - Card log → Google Drive (details and post settings; the private photo copies used for re-editing stay on the phone). Settings › Set up Drive backup creates `strike3-backup.json` (restore file) and `strike3-collection.csv` (opens in Google Sheets). Both are rewritten after every change.
 - Photos → Google Photos. Posts go to `Pictures/Strike III`, originals to `Pictures/Strike III Originals`. Turn on backup for both folders in Google Photos.
 - **Card #** — every card's printed number/code (TOTD-22, BCP-139, US325, #287) has its own field. The reader fills it from the back (or a grading label), search finds it with or without the dash ("totd22"), and it's a column in CSV/Excel export and import. Cards added before this field got their number copied from Notes once.
+- **Numbered cards** — only the print run is kept ("/199"; one-of-ones are "1/1"). The serial box asks just for the number it's numbered to, and cards saved earlier were trimmed once.
 - **Export photos for Claude** (Settings) — one zip of every card's front/back photos plus `cards.json` with the saved details, so the card reader can be tested and tuned against real photos.
 
 ## Getting the APK
