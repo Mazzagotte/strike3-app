@@ -30,6 +30,7 @@ object CsvImport {
         val cYear = col("year")
         val cSet = col("set", "set name")
         val cParallel = col("parallel")
+        val cCard = col("card #", "card number", "card no", "card no.", "card num", "number", "#")
         val cSerial = col("serial", "serial number")
         val cTeam = col("team")
         val cAuto = col("auto")
@@ -55,6 +56,7 @@ object CsvImport {
                 text(cYear)?.let { c = c.copy(year = it.removeSuffix(".0")) }
                 text(cSet)?.let { c = c.copy(setName = it) }
                 text(cParallel)?.let { c = c.copy(parallel = it) }
+                text(cCard)?.let { c = c.copy(cardNumber = it.uppercase().removePrefix("#").trim()) }
                 text(cSerial)?.let { c = c.copy(serial = it.replace(" ", "")) }
                 text(cTeam)?.let { c = c.copy(team = it) }
                 text(cAuto)?.let { c = c.copy(isAuto = yes(it)) }
@@ -83,7 +85,7 @@ object CsvImport {
         return Plan(updated, added, unchanged, skipped)
     }
 
-    private val CHECK_FIELDS = setOf("player", "year", "set", "parallel", "serial", "team")
+    private val CHECK_FIELDS = setOf("player", "year", "set", "parallel", "serial", "team", "card")
 
     private fun yes(s: String) = s.trim().lowercase() in setOf("yes", "y", "true", "x", "1", "✓", "✔")
 

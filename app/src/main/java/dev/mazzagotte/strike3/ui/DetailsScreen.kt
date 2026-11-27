@@ -263,8 +263,11 @@ fun DetailsScreen(editId: Long?, editor: EditorViewModel, onDone: (Long) -> Unit
             Field("Player", card.player, words = true, unsure = CardText.F.PLAYER in unsure) { card = card.copy(player = it).checked(CardText.F.PLAYER) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field("Year", card.year, number = true, modifier = Modifier.weight(0.35f), unsure = CardText.F.YEAR in unsure) { card = card.copy(year = it).checked(CardText.F.YEAR) }
-                Field("Set", card.setName, words = true, modifier = Modifier.weight(0.65f), unsure = CardText.F.SET in unsure) { card = card.copy(setName = it).checked(CardText.F.SET) }
+                Field("Card #", card.cardNumber, modifier = Modifier.weight(0.65f), unsure = CardText.F.CARD in unsure) {
+                    card = card.copy(cardNumber = it.uppercase()).checked(CardText.F.CARD)
+                }
             }
+            Field("Set", card.setName, words = true, unsure = CardText.F.SET in unsure) { card = card.copy(setName = it).checked(CardText.F.SET) }
             Field("Parallel", card.parallel, words = true, unsure = CardText.F.PARALLEL in unsure) { card = card.copy(parallel = it).checked(CardText.F.PARALLEL) }
             ParallelSuggestions(card, allCards, borderColor) { card = card.copy(parallel = it).checked(CardText.F.PARALLEL) }
             SerialField(card.serial, { card = card.copy(serial = it).checked(CardText.F.SERIAL) }, Modifier.fillMaxWidth())

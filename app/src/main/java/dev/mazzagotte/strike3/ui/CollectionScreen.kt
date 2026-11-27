@@ -374,6 +374,7 @@ private fun CardRow(card: Card, showPost: Boolean, onClick: () -> Unit) {
                 Text(card.subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             val flags = listOfNotNull(
+                card.cardNumber.takeIf { it.isNotBlank() }?.let { "#$it" },
                 card.serial.takeIf { it.isNotBlank() },
                 "Auto".takeIf { card.isAuto },
                 "RC".takeIf { card.isRookie },

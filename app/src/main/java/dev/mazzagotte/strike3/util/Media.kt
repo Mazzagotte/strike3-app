@@ -47,7 +47,11 @@ object Media {
     }
 
     /** Saves a file to Downloads/Strike III (no picker needed) and returns it, ready to open or share. */
-    fun saveDownload(context: Context, fileName: String, mime: String, bytes: ByteArray): Uri {
+    fun saveDownload(context: Context, fileName: String, mime: String, bytes: ByteArray): Uri =
+        saveDownloadStream(context, fileName, mime) { it.write(bytes) }
+
+    /** Like [saveDownload], but writes straight into the file (for big files like a photo zip). */
+    fun saveDownloadStream(context: Context, fileName: String, mime: String, write: (java.io.OutputStream) -> Unit): Uri {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
             put(MediaStore.Downloads.MIME_TYPE, mime)
@@ -58,7 +62,7 @@ object Media {
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: error("couldn't create the file in Downloads")
         try {
-            resolver.openOutputStream(uri, "w")?.use { it.write(bytes) } ?: error("couldn't write the file")
+            resolver.openOutputStream(uri, "w")?.use { write(it) } ?: error("couldn't write the file")
         } catch (e: Throwable) {
             runCatching { resolver.delete(uri, null, null) }
             throw e

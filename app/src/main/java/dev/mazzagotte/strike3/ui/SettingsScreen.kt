@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.CsvImport
 import dev.mazzagotte.strike3.data.DriveBackup
+import dev.mazzagotte.strike3.data.PhotoExport
 import dev.mazzagotte.strike3.data.Xlsx
 import androidx.compose.foundation.layout.Row
 import dev.mazzagotte.strike3.util.Media
@@ -82,6 +83,30 @@ fun SettingsScreen(onBack: () -> Unit) {
     // Excel file with the front and back photos in their cells, saved straight to Downloads
     var exporting by remember { mutableStateOf<String?>(null) }
     var exported by remember { mutableStateOf<Pair<android.net.Uri, String>?>(null) }
+    // Zip of every card's photos + details, for improving the card reader with Claude
+    var zipping by remember { mutableStateOf<String?>(null) }
+    var zipped by remember { mutableStateOf<Pair<android.net.Uri, String>?>(null) }
+    fun exportPhotos() {
+        scope.launch {
+            zipping = "Packing photos…"
+            try {
+                val cards = repo.cards().first()
+                val name = "strike3-photos-" + Media.stamp() + ".zip"
+                var result: PhotoExport.Result? = null
+                val uri = withContext(Dispatchers.IO) {
+                    Media.saveDownloadStream(context, name, "application/zip") { out ->
+                        result = PhotoExport.write(out, cards) { done, total -> scope.launch { zipping = "Packing photos… $done of $total" } }
+                    }
+                }
+                zipped = uri to "Saved $name to Downloads › Strike III (${result?.photos ?: 0} photos from ${cards.size} cards)."
+            } catch (e: Throwable) {
+                dialog = "Couldn't export the photos: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                zipping = null
+            }
+        }
+    }
+
     fun exportExcel() {
         scope.launch {
             exporting = "Making photos…"
@@ -177,6 +202,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ) { Text("Restore from backup file") }
             }
 
+            Section("Help the card reader") {
+                Text(
+                    "Export every card's front and back photo with its details as one zip, then share it with Claude " +
+                        "(attach it in a chat, or put it on your computer). Claude can test the card reader against your real " +
+                        "photos and fix what it misreads.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = { exportPhotos() }, enabled = zipping == null, modifier = Modifier.fillMaxWidth()) {
+                    Text(zipping ?: "Export photos for Claude")
+                }
+            }
+
             Section("Export") {
                 Text(
                     "Save the whole collection as a spreadsheet anywhere: Downloads, Drive, or send it on. " +
@@ -245,6 +282,18 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }) { Text("Import") }
             },
             dismissButton = { TextButton(onClick = { importPlan = null }) { Text("Cancel") } },
+        )
+    }
+
+    zipped?.let { (uri, msg) ->
+        AlertDialog(
+            onDismissRequest = { zipped = null },
+            title = { Text("Photos exported") },
+            text = { Text("$msg Share it to Google Drive or your computer, then give it to Claude.") },
+            confirmButton = {
+                TextButton(onClick = { zipped = null; Media.shareFile(context, uri, "application/zip", "Send photos") }) { Text("Share") }
+            },
+            dismissButton = { TextButton(onClick = { zipped = null }) { Text("Done") } },
         )
     }
 

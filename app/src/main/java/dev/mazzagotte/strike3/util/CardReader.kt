@@ -65,6 +65,7 @@ object CardReader {
             parallel = pick(CardText.F.PARALLEL, card.parallel, before?.parallel, g.parallel),
             serial = pick(CardText.F.SERIAL, card.serial, before?.serial, g.serial),
             team = pick(CardText.F.TEAM, card.team, before?.team, g.team),
+            cardNumber = pick(CardText.F.CARD, card.cardNumber, before?.cardNumber, g.cardNumber),
             isAuto = card.isAuto || g.isAuto,
             isRookie = card.isRookie || g.isRookie,
             isPatch = card.isPatch || g.isRelic,

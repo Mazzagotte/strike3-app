@@ -24,9 +24,10 @@ import java.util.zip.ZipOutputStream
 object Xlsx {
 
     private val HEADER = listOf(
-        "ID", "Front", "Back", "Player", "Year", "Set", "Parallel", "Serial", "Team",
+        "ID", "Front", "Back", "Player", "Year", "Set", "Card #", "Parallel", "Serial", "Team",
         "Auto", "Rookie", "Relic", "Current value", "Date acquired", "Posted", "Notes", "Check",
     )
+    private fun col(name: String) = HEADER.indexOf(name).also { require(it >= 0) { name } }
     private const val COL_FRONT = 1
     private const val COL_BACK = 2
     private const val THUMB_PX = 360
@@ -148,7 +149,7 @@ object Xlsx {
         // Keep the header visible while scrolling
         append("""<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>""")
         append("<cols>")
-        val widths = listOf(6, 13, 13, 22, 7, 22, 18, 10, 18, 6, 7, 6, 13, 13, 7, 30, 14)
+        val widths = listOf(6, 13, 13, 22, 7, 22, 11, 18, 10, 18, 6, 7, 6, 13, 13, 7, 30, 14)
         widths.forEachIndexed { i, w -> append("""<col min="${i + 1}" max="${i + 1}" width="$w" customWidth="1"/>""") }
         append("</cols><sheetData>")
         append("""<row r="1">""")
@@ -160,23 +161,27 @@ object Xlsx {
             append(numberCell(0, r, c.id.toDouble()))
             // Photos sit inside their cells (Excel "Place in Cell")
             for (col in listOf(COL_FRONT, COL_BACK)) vm[col to (r - 1)]?.let { append("""<c r="${ref(col, r)}" t="e" vm="$it"><v>#VALUE!</v></c>""") }
-            val values = listOf(
-                c.player, c.year, c.setName, c.parallel, c.serial, c.team,
-                yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
-            )
             // Guessed fields are yellow, like the "Check" column lists them
-            val guessed = listOf("player", "year", "set", "parallel", "serial", "team").map { it in c.unsure }
-            values.forEachIndexed { k, v ->
-                val yellow = guessed.getOrElse(k) { false }
-                if (v.isNotEmpty() || yellow) append(textCell(3 + k, r, v, style = if (yellow) 2 else 0))
+            val guessed = c.unsure
+            fun text(name: String, v: String, field: String? = null) {
+                val yellow = field != null && field in guessed
+                if (v.isNotEmpty() || yellow) append(textCell(col(name), r, v, style = if (yellow) 2 else 0))
             }
+            text("Player", c.player, "player")
+            text("Year", c.year, "year")
+            text("Set", c.setName, "set")
+            text("Card #", c.cardNumber, "card")
+            text("Parallel", c.parallel, "parallel")
+            text("Serial", c.serial, "serial")
+            text("Team", c.team, "team")
+            text("Auto", yes(c.isAuto)); text("Rookie", yes(c.isRookie)); text("Relic", yes(c.isPatch))
             val value = c.valueNumber
-            if (value != null && c.currentValue.trim().all { it.isDigit() || it in "$,. " }) append(numberCell(12, r, value))
-            else if (c.currentValue.isNotBlank()) append(textCell(12, r, c.currentValue))
-            if (c.dateAcquired.isNotBlank()) append(textCell(13, r, c.dateAcquired))
-            append(textCell(14, r, yes(c.posted)))
-            if (c.notes.isNotBlank()) append(textCell(15, r, c.notes))
-            if (c.unsureFields.isNotBlank()) append(textCell(16, r, c.unsureFields, style = 2))
+            if (value != null && c.currentValue.trim().all { it.isDigit() || it in "$,. " }) append(numberCell(col("Current value"), r, value))
+            else text("Current value", c.currentValue)
+            text("Date acquired", c.dateAcquired)
+            append(textCell(col("Posted"), r, yes(c.posted)))
+            text("Notes", c.notes)
+            if (c.unsureFields.isNotBlank()) append(textCell(col("Check"), r, c.unsureFields, style = 2))
             append("</row>")
         }
         append("</sheetData>")

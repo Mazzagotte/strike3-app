@@ -104,6 +104,7 @@ object DriveBackup {
                     put("currentValue", card.currentValue)
                     put("needsReview", card.needsReview)
                     put("unsureFields", card.unsureFields)
+                    put("cardNumber", card.cardNumber)
                     put("posted", card.posted)
                     put("notes", card.notes)
                     put("postUri", card.postUri ?: JSONObject.NULL)
@@ -131,6 +132,7 @@ object DriveBackup {
         currentValue = o.optString("currentValue"),
         needsReview = o.optBoolean("needsReview"),
         unsureFields = o.optString("unsureFields"),
+        cardNumber = o.optString("cardNumber"),
         posted = o.optBoolean("posted"),
         notes = o.optString("notes"),
         postUri = if (o.isNull("postUri")) null else o.optString("postUri"),
@@ -142,12 +144,12 @@ object DriveBackup {
     /** The collection as a spreadsheet (also used by Settings > Export CSV). */
     fun toCsv(cards: List<Card>): String {
         val header = listOf(
-            "ID", "Player", "Year", "Set", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
+            "ID", "Player", "Year", "Set", "Card #", "Parallel", "Serial", "Team", "Auto", "Rookie", "Relic",
             "Current value", "Date acquired", "Posted", "Notes", "Check",
         )
         val rows = cards.map { c ->
             listOf(
-                c.id.toString(), c.player, c.year, c.setName, c.parallel,
+                c.id.toString(), c.player, c.year, c.setName, c.cardNumber, c.parallel,
                 // ="1/1" so Sheets and Excel keep serials as text instead of turning them into dates
                 if (c.serial.isBlank()) "" else "=\"" + c.serial + "\"",
                 c.team,

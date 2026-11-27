@@ -43,8 +43,11 @@ object CardSearch {
             return printRun(card) == w.drop(1).trimStart('0')
         }
         // Plain text in any field
-        val fields = listOf(card.player, card.team, card.setName, card.parallel, card.year, card.serial, card.notes)
+        val fields = listOf(card.player, card.team, card.setName, card.parallel, card.year, card.serial, card.cardNumber, card.notes)
         if (fields.any { it.lowercase().contains(w) }) return true
+        // Card number without the punctuation: "totd22" or "bcp139" finds TOTD-22 / BCP-139
+        val bare = w.filter { it.isLetterOrDigit() }
+        if (bare.length >= 2 && card.cardNumber.lowercase().filter { it.isLetterOrDigit() }.let { it.isNotEmpty() && it.contains(bare) }) return true
         // Small typo in a player or team name
         if (w.length >= 4 && w.all { it.isLetter() }) {
             val allowed = if (w.length < 7) 1 else 2

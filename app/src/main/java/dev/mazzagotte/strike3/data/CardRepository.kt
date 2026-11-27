@@ -1,5 +1,6 @@
 package dev.mazzagotte.strike3.data
 
+import dev.mazzagotte.strike3.util.CardText
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,25 @@ class CardRepository(private val context: Context) {
     }
 
     /** Writes the Drive backup a moment after the last change, so quick edits make one write. */
+    /**
+     * One time after the Card # field arrives: copy card numbers that are already written in Notes
+     * (a code like TOTD-22 / BCP-139, or a grading label's "#287") into the new field.
+     */
+    fun backfillCardNumbers() {
+        val prefs = context.getSharedPreferences("migrations", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("cardNumbers", false)) return
+        scope.launch {
+            val changed = dao.allNow().filter { it.cardNumber.isBlank() }.mapNotNull { c ->
+                CardText.cardNumberIn(c.notes)?.let { c.copy(cardNumber = it.uppercase()) }
+            }
+            if (changed.isNotEmpty()) {
+                dao.insertAll(changed)
+                scheduleBackup()
+            }
+            prefs.edit().putBoolean("cardNumbers", true).apply()
+        }
+    }
+
     fun scheduleBackup() {
         backupJob?.cancel()
         backupJob = scope.launch {

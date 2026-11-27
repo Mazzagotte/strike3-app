@@ -10,5 +10,6 @@ class Strike3App : Application() {
     override fun onCreate() {
         super.onCreate()
         repo = CardRepository(this)
+        repo.backfillCardNumbers()
     }
 }

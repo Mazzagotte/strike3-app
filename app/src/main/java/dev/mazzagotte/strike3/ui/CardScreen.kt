@@ -333,6 +333,7 @@ fun CardScreen(
                 Detail("Player", c.player, "player" in u)
                 Detail("Year", c.year, "year" in u)
                 Detail("Set", c.setName, "set" in u)
+                Detail("Card #", c.cardNumber, "card" in u)
                 Detail("Parallel", c.parallel, "parallel" in u)
                 Detail("Serial", c.serial, "serial" in u)
                 Detail("Team", c.team, "team" in u)

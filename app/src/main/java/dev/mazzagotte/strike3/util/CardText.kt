@@ -24,6 +24,7 @@ object CardText {
     object F {
         const val PLAYER = "player"; const val YEAR = "year"; const val SET = "set"
         const val PARALLEL = "parallel"; const val SERIAL = "serial"; const val TEAM = "team"
+        const val CARD = "card"
     }
 
     data class Guess(
@@ -33,6 +34,8 @@ object CardText {
         val parallel: String = "",
         val serial: String = "",
         val team: String = "",
+        /** Card number/code: "TOTD-22", "BCP-139", "US325", "287". */
+        val cardNumber: String = "",
         val isAuto: Boolean = false,
         val isRookie: Boolean = false,
         val isRelic: Boolean = false,
@@ -51,6 +54,7 @@ object CardText {
                 "parallel".takeIf { parallel.isNotBlank() },
                 "serial".takeIf { serial.isNotBlank() },
                 "team".takeIf { team.isNotBlank() },
+                "card #".takeIf { cardNumber.isNotBlank() },
                 "auto".takeIf { isAuto },
                 "rookie".takeIf { isRookie },
                 "relic".takeIf { isRelic },
@@ -320,6 +324,13 @@ object CardText {
         num in 1..den && den in 1..9999 && !dateShaped
     }?.let { "${it[1]}/${it[2]}" }
 
+    /** "#287", "No. 287", "Card No. 26" -> "287" (only these explicit forms; bare numbers are too often stats). */
+    fun plainNumber(text: String): String? =
+        Regex("""(?:^|[\s(])(?:#|no\.?\s?|card\s+no\.?\s?)\s?(\d{1,4}[A-Z]?)\b""", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)
+
+    /** Card number found in any text (e.g. Notes): a code like TOTD-22 first, then "#287". */
+    fun cardNumberIn(text: String): String? = cardCode(text)?.code ?: plainNumber(text)
+
     // ---------- 6. Grading labels ----------
 
     data class Slab(val grader: String, val grade: String, val year: String?, val set: String?, val number: String?)
@@ -380,7 +391,9 @@ object CardText {
         val isRookie = Regex("""\brookie card\b|\bRC\b""").containsMatchIn(all)
         val isRelic = Regex("""\brelic\b|\bpatch card\b|\bmemorabilia\b|\bgame-used\b|\bjersey card\b""", RegexOption.IGNORE_CASE).containsMatchIn(all)
 
-        code?.let { notes += listOfNotNull(it.insert, it.code).joinToString(" ") }
+        // Card number: a code like TOTD-22 / BCP-139 (sure), else the grading label's #, else "#287" / "No. 287"
+        val number = code?.code ?: slab?.number ?: plainNumber(all)?.also { unsure += F.CARD }
+        code?.insert?.let { notes += it }
         slab?.let { s -> notes += listOfNotNull("${s.grader} ${s.grade}".trim(), s.number?.let { "#$it" }).joinToString(", ") }
 
         return Guess(
@@ -389,6 +402,7 @@ object CardText {
             setName = set.orEmpty(),
             serial = serial.orEmpty(),
             team = team,
+            cardNumber = number.orEmpty(),
             isAuto = isAuto,
             isRookie = isRookie,
             isRelic = isRelic,
@@ -447,6 +461,7 @@ object CardText {
             parallel = parallel,
             serial = serial,
             team = b.team.ifBlank { f.team },
+            cardNumber = pick(F.CARD, b.cardNumber, f.cardNumber),
             isAuto = b.isAuto || f.isAuto,
             isRookie = b.isRookie || f.isRookie,
             isRelic = b.isRelic || f.isRelic,

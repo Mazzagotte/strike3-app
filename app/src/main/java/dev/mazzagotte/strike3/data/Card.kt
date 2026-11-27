@@ -49,6 +49,8 @@ data class Card(
     val currentValue: String = "",
     /** Added in a batch and the details haven't been checked yet. */
     val needsReview: Boolean = false,
+    /** The card's number/code as printed, e.g. "TOTD-22", "BCP-139", "US325", "287". */
+    val cardNumber: String = "",
     /** Fields the card reader guessed and you haven't checked yet ("year,serial"). */
     val unsureFields: String = "",
 ) {
@@ -95,7 +97,7 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 4, exportSchema = false)
+@Database(entities = [Card::class], version = 5, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
@@ -121,9 +123,15 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN cardNumber TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDb =
             Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }
