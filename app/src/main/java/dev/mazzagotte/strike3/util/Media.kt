@@ -46,6 +46,45 @@ object Media {
         return uri
     }
 
+    /** Saves a file to Downloads/Strike III (no picker needed) and returns it, ready to open or share. */
+    fun saveDownload(context: Context, fileName: String, mime: String, bytes: ByteArray): Uri {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, mime)
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/Strike III")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("couldn't create the file in Downloads")
+        try {
+            resolver.openOutputStream(uri, "w")?.use { it.write(bytes) } ?: error("couldn't write the file")
+        } catch (e: Throwable) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw e
+        }
+        values.clear()
+        values.put(MediaStore.Downloads.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        return uri
+    }
+
+    /** Opens the share sheet for a saved file (Drive, Gmail, Messages…). */
+    fun shareFile(context: Context, uri: Uri, mime: String, title: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    /** Opens a saved file in an app that can view it (Excel, Sheets…). */
+    fun openFile(context: Context, uri: Uri, mime: String) {
+        val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching { context.startActivity(Intent.createChooser(view, "Open with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
     /** Removes an image the app saved earlier (ignored if it's already gone). */
     fun delete(context: Context, uri: Uri) {
         try {

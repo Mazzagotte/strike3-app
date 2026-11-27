@@ -37,6 +37,8 @@ import dev.mazzagotte.strike3.Strike3App
 import dev.mazzagotte.strike3.data.CsvImport
 import dev.mazzagotte.strike3.data.DriveBackup
 import dev.mazzagotte.strike3.data.Xlsx
+import androidx.compose.foundation.layout.Row
+import dev.mazzagotte.strike3.util.Media
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -77,16 +79,16 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
     }
-    // Excel file with a front and back photo in each row
+    // Excel file with the front and back photos in their cells, saved straight to Downloads
     var exporting by remember { mutableStateOf<String?>(null) }
-    val exportXlsx = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-    ) { uri ->
-        if (uri != null) scope.launch {
+    var exported by remember { mutableStateOf<Pair<android.net.Uri, String>?>(null) }
+    fun exportExcel() {
+        scope.launch {
             exporting = "Making photos…"
-            dialog = try {
+            try {
                 val cards = repo.cards().first()
-                val size = withContext(Dispatchers.IO) {
+                val name = "strike3-collection-" + Media.stamp() + ".xlsx"
+                val uri = withContext(Dispatchers.IO) {
                     // Build the whole file first, so a problem can't leave a half-written file behind
                     val bytes = java.io.ByteArrayOutputStream().also { buf ->
                         Xlsx.write(buf, cards) { done, total ->
@@ -94,13 +96,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     }.toByteArray()
                     if (!Xlsx.looks(bytes)) error("the file came out empty")
-                    DriveBackup.writeBytes(context, uri, bytes)
-                    bytes.size
+                    Media.saveDownload(context, name, XLSX_MIME, bytes).also {
+                        exported = it to "Saved $name to Downloads › Strike III " +
+                            "(${cards.size} card${if (cards.size == 1) "" else "s"}, ${"%.1f".format(bytes.size / 1_048_576.0)} MB)."
+                    }
                 }
-                "Exported ${cards.size} card${if (cards.size == 1) "" else "s"} with photos (${"%.1f".format(size / 1_048_576.0)} MB)."
             } catch (e: Throwable) {
-                discard(context, uri)
-                "Couldn't export: ${e.message ?: e.javaClass.simpleName}"
+                dialog = "Couldn't export: ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 exporting = null
             }
@@ -178,11 +180,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             Section("Export") {
                 Text(
                     "Save the whole collection as a spreadsheet anywhere: Downloads, Drive, or send it on. " +
-                        "The Excel file has a small front and back photo in every row and opens in Excel or Google Sheets.",
+                        "The Excel file goes straight to Downloads › Strike III, with the front and back photos placed in their cells (shown in Excel for Microsoft 365). Share it from there to Drive, email and so on.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(
-                    onClick = { exportXlsx.launch("strike3-collection-" + java.time.LocalDate.now() + ".xlsx") },
+                    onClick = { exportExcel() },
                     enabled = exporting == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(exporting ?: "Export Excel with photos") }
@@ -246,6 +248,23 @@ fun SettingsScreen(onBack: () -> Unit) {
         )
     }
 
+    exported?.let { (uri, msg) ->
+        AlertDialog(
+            onDismissRequest = { exported = null },
+            title = { Text("Excel file saved") },
+            text = { Text(msg + " Photos are placed in their cells, which shows in Excel for Microsoft 365.") },
+            confirmButton = {
+                TextButton(onClick = { exported = null; Media.shareFile(context, uri, XLSX_MIME, "Send spreadsheet") }) { Text("Share") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { exported = null; Media.openFile(context, uri, XLSX_MIME) }) { Text("Open") }
+                    TextButton(onClick = { exported = null }) { Text("Done") }
+                }
+            },
+        )
+    }
+
     dialog?.let {
         AlertDialog(
             onDismissRequest = { dialog = null },
@@ -259,3 +278,5 @@ fun SettingsScreen(onBack: () -> Unit) {
 private fun discard(context: android.content.Context, uri: android.net.Uri) {
     runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) }
 }
+
+private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

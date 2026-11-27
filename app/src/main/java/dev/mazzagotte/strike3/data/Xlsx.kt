@@ -14,7 +14,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * Excel (.xlsx) export with a small front and back photo in every row, and a reader so an edited
+ * Excel (.xlsx) export with the front and back photos placed inside their cells (Excel "Place in Cell"), and a reader so an edited
  * file can be imported straight back. Written by hand (an .xlsx is a zip of XML files), so no big
  * spreadsheet library is needed.
  *
@@ -30,10 +30,8 @@ object Xlsx {
     private const val COL_FRONT = 1
     private const val COL_BACK = 2
     private const val THUMB_PX = 360
-    /** Row height in points; photos are a little shorter so they sit inside the row. */
+    /** Row height in points, tall enough for the photos placed in the cells. */
     private const val ROW_PT = 96.0
-    private const val PHOTO_PT = 90.0
-    private const val EMU_PER_PT = 12700L
 
     // ---------- Export ----------
 
@@ -50,32 +48,66 @@ object Xlsx {
             onProgress(i + 1, cards.size)
         }
 
+        // Photo k goes in its cell as "value metadata" k+1, which points at rich value k, which points at image k
+        val vm = HashMap<Pair<Int, Int>, Int>()
+        pics.forEachIndexed { k, p -> vm[p.col to p.row] = k + 1 }
+
         ZipOutputStream(out).use { zip ->
             fun put(name: String, text: String) {
                 zip.putNextEntry(ZipEntry(name)); zip.write(text.toByteArray(Charsets.UTF_8)); zip.closeEntry()
             }
-            put("[Content_Types].xml", contentTypes(pics.isNotEmpty()))
+            val images = pics.isNotEmpty()
+            put("[Content_Types].xml", contentTypes(images))
             put("_rels/.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>""")
             put("xl/workbook.xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Collection" sheetId="1" r:id="rId1"/></sheets></workbook>""")
-            put("xl/_rels/workbook.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>""")
+            put("xl/_rels/workbook.xml.rels", buildString {
+                append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">""")
+                append("""<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>""")
+                append("""<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>""")
+                if (images) {
+                    append("""<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata" Target="metadata.xml"/>""")
+                    append("""<Relationship Id="rId4" Type="http://schemas.microsoft.com/office/2022/10/relationships/richValueRel" Target="richData/richValueRel.xml"/>""")
+                    append("""<Relationship Id="rId5" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValue" Target="richData/rdrichvalue.xml"/>""")
+                    append("""<Relationship Id="rId6" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueStructure" Target="richData/rdrichvaluestructure.xml"/>""")
+                    append("""<Relationship Id="rId7" Type="http://schemas.microsoft.com/office/2017/06/relationships/rdRichValueTypes" Target="richData/rdRichValueTypes.xml"/>""")
+                }
+                append("</Relationships>")
+            })
             put("xl/styles.xml", STYLES)
-            put("xl/worksheets/sheet1.xml", sheet(cards, pics.isNotEmpty()))
-            if (pics.isNotEmpty()) {
-                put("xl/worksheets/_rels/sheet1.xml.rels", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>""")
-                put("xl/drawings/drawing1.xml", drawing(pics))
-                put("xl/drawings/_rels/drawing1.xml.rels", buildString {
+            put("xl/worksheets/sheet1.xml", sheet(cards, vm))
+            if (images) {
+                val n = pics.size
+                put("xl/metadata.xml", buildString {
+                    append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xlrd="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata">""")
+                    append("""<metadataTypes count="1"><metadataType name="XLRICHVALUE" minSupportedVersion="120000" copy="1" pasteAll="1" pasteValues="1" merge="1" splitFirst="1" rowColShift="1" clearFormats="1" clearComments="1" assign="1" coerce="1"/></metadataTypes>""")
+                    append("""<futureMetadata name="XLRICHVALUE" count="$n">""")
+                    for (k in 0 until n) append("""<bk><extLst><ext uri="{3e2802c4-a4d2-4d8b-9148-e3be6c30e623}"><xlrd:rvb i="$k"/></ext></extLst></bk>""")
+                    append("""</futureMetadata><valueMetadata count="$n">""")
+                    for (k in 0 until n) append("""<bk><rc t="1" v="$k"/></bk>""")
+                    append("</valueMetadata></metadata>")
+                })
+                put("xl/richData/rdrichvalue.xml", buildString {
+                    append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><rvData xmlns="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" count="$n">""")
+                    for (k in 0 until n) append("""<rv s="0"><v>$k</v><v>5</v></rv>""")
+                    append("</rvData>")
+                })
+                put("xl/richData/rdrichvaluestructure.xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<rvStructures xmlns="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" count="1"><s t="_localImage"><k n="_rvRel:LocalImageIdentifier" t="i"/><k n="CalcOrigin" t="i"/></s></rvStructures>""")
+                put("xl/richData/rdRichValueTypes.xml", RV_TYPES)
+                put("xl/richData/richValueRel.xml", buildString {
+                    append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><richValueRels xmlns="http://schemas.microsoft.com/office/spreadsheetml/2022/richvaluerel" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">""")
+                    for (k in 0 until n) append("""<rel r:id="rId${k + 1}"/>""")
+                    append("</richValueRels>")
+                })
+                put("xl/richData/_rels/richValueRel.xml.rels", buildString {
                     append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">""")
-                    pics.indices.forEach { n ->
-                        append("""<Relationship Id="rId${n + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${n + 1}.jpeg"/>""")
-                    }
+                    for (k in 0 until n) append("""<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${k + 1}.jpeg"/>""")
                     append("</Relationships>")
                 })
-                pics.forEachIndexed { n, p ->
-                    zip.putNextEntry(ZipEntry("xl/media/image${n + 1}.jpeg")); zip.write(p.jpeg); zip.closeEntry()
+                pics.forEachIndexed { k, p ->
+                    zip.putNextEntry(ZipEntry("xl/media/image${k + 1}.jpeg")); zip.write(p.jpeg); zip.closeEntry()
                 }
             }
         }
@@ -97,7 +129,13 @@ object Xlsx {
         append("""<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>""")
         append("""<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>""")
         append("""<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>""")
-        if (images) append("""<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>""")
+        if (images) {
+            append("""<Override PartName="/xl/metadata.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"/>""")
+            append("""<Override PartName="/xl/richData/rdRichValueTypes.xml" ContentType="application/vnd.ms-excel.rdrichvaluetypes+xml"/>""")
+            append("""<Override PartName="/xl/richData/rdrichvalue.xml" ContentType="application/vnd.ms-excel.rdrichvalue+xml"/>""")
+            append("""<Override PartName="/xl/richData/rdrichvaluestructure.xml" ContentType="application/vnd.ms-excel.rdrichvaluestructure+xml"/>""")
+            append("""<Override PartName="/xl/richData/richValueRel.xml" ContentType="application/vnd.ms-excel.richvaluerel+xml"/>""")
+        }
         append("</Types>")
     }
 
@@ -105,7 +143,7 @@ object Xlsx {
     private const val STYLES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEB3B"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"""
 
-    private fun sheet(cards: List<Card>, hasDrawing: Boolean) = buildString {
+    private fun sheet(cards: List<Card>, vm: Map<Pair<Int, Int>, Int>) = buildString {
         append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">""")
         // Keep the header visible while scrolling
         append("""<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>""")
@@ -120,6 +158,8 @@ object Xlsx {
             val r = i + 2
             append("""<row r="$r" ht="$ROW_PT" customHeight="1">""")
             append(numberCell(0, r, c.id.toDouble()))
+            // Photos sit inside their cells (Excel "Place in Cell")
+            for (col in listOf(COL_FRONT, COL_BACK)) vm[col to (r - 1)]?.let { append("""<c r="${ref(col, r)}" t="e" vm="$it"><v>#VALUE!</v></c>""") }
             val values = listOf(
                 c.player, c.year, c.setName, c.parallel, c.serial, c.team,
                 yes(c.isAuto), yes(c.isRookie), yes(c.isPatch),
@@ -140,7 +180,6 @@ object Xlsx {
             append("</row>")
         }
         append("</sheetData>")
-        if (hasDrawing) append("""<drawing r:id="rId1"/>""")
         append("</worksheet>")
     }
 
@@ -172,19 +211,8 @@ object Xlsx {
         }
     }
 
-    private fun drawing(pics: List<Pic>) = buildString {
-        append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">""")
-        pics.forEachIndexed { n, p ->
-            val cy = (PHOTO_PT * EMU_PER_PT).toLong()
-            val cx = cy * p.w / p.h
-            val pad = 3 * EMU_PER_PT
-            append("""<xdr:oneCellAnchor><xdr:from><xdr:col>${p.col}</xdr:col><xdr:colOff>$pad</xdr:colOff><xdr:row>${p.row}</xdr:row><xdr:rowOff>$pad</xdr:rowOff></xdr:from>""")
-            append("""<xdr:ext cx="$cx" cy="$cy"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${n + 2}" name="Photo ${n + 1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>""")
-            append("""<xdr:blipFill><a:blip r:embed="rId${n + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>""")
-            append("""<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="$cx" cy="$cy"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>""")
-        }
-        append("</xdr:wsDr>")
-    }
+    private const val RV_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<rvTypesInfo xmlns="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><global><keyFlags><key name="_Self"><flag name="ExcludeFromFile" value="1"/><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_DisplayString"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_Flags"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_Format"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_SubLabel"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_Attribution"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_Icon"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_Display"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_CanonicalPropertyNames"><flag name="ExcludeFromCalcComparison" value="1"/></key><key name="_ClassificationId"><flag name="ExcludeFromCalcComparison" value="1"/></key></keyFlags></global></rvTypesInfo>"""
 
     // ---------- Import ----------
 
