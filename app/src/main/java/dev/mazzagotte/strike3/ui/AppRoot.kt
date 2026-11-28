@@ -23,6 +23,8 @@ sealed interface Screen {
     data object Batch : Screen
     data object Stats : Screen
     data object Value : Screen
+    /** "Do I have this?": photo of a card -> matches in the collection. */
+    data object Lookup : Screen
 }
 
 class NavViewModel : ViewModel() {
@@ -47,6 +49,7 @@ fun AppRoot(
     editor: EditorViewModel = viewModel(),
     collection: CollectionViewModel = viewModel(),
     batch: BatchViewModel = viewModel(),
+    lookup: LookupViewModel = viewModel(),
 ) {
     BackHandler(enabled = nav.canGoBack) { nav.back() }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -63,6 +66,10 @@ fun AppRoot(
                 vm = collection,
                 onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
                 onSettings = { nav.go(Screen.Settings) },
+                onLookup = {
+                    lookup.reset()
+                    nav.go(Screen.Lookup)
+                },
             )
             is Screen.Capture -> CaptureScreen(
                 onPhoto = { uri, frame ->
@@ -134,6 +141,15 @@ fun AppRoot(
                 },
             )
             Screen.Settings -> SettingsScreen(onBack = nav::back)
+            Screen.Lookup -> LookupScreen(
+                vm = lookup,
+                onOpen = { id, ids -> nav.go(Screen.CardView(id, ids)) },
+                onAdd = { uri, frame ->
+                    editor.load(uri, frame)
+                    nav.go(Screen.Details(null, catalog = true))
+                },
+                onBack = nav::back,
+            )
         }
     }
 }

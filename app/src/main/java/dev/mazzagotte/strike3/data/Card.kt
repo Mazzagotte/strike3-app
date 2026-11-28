@@ -54,6 +54,12 @@ data class Card(
     /** Text the reader saw on the photos (front, then back after a "---BACK---" line), kept so
      *  reader fixes can be re-run on saved cards without new photos. Not shown in the app. */
     val scanText: String = "",
+    /** Photo fingerprints for "Do I have this?" ([dev.mazzagotte.strike3.util.CardPrint], Base64).
+     *  Worked out from the photos on the phone; not backed up. */
+    val frontPrint: String = "",
+    val backPrint: String = "",
+    /** Which photos the prints were made from, so they're redone when a photo changes. */
+    val printKey: String = "",
     /** Fields the card reader guessed and you haven't checked yet ("year,serial"). */
     val unsureFields: String = "",
 ) {
@@ -100,7 +106,7 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 6, exportSchema = false)
+@Database(entities = [Card::class], version = 7, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
@@ -138,9 +144,17 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN frontPrint TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE cards ADD COLUMN backPrint TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE cards ADD COLUMN printKey TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDb =
             Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
     }
 }

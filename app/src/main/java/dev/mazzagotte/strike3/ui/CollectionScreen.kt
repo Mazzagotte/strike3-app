@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -91,6 +92,7 @@ fun CollectionScreen(
     onAddCard: () -> Unit,
     onBatch: () -> Unit,
     onStats: () -> Unit,
+    onLookup: () -> Unit,
     onValue: () -> Unit,
     /** Opens a card; [ids] is the current results in order, for swiping between cards. */
     onOpen: (id: Long, ids: List<Long>) -> Unit,
@@ -153,6 +155,7 @@ fun CollectionScreen(
                             )
                         }
                     }
+                    IconButton(onClick = onLookup) { Icon(Icons.Filled.ImageSearch, "Do I have this?") }
                     IconButton(onClick = onValue) { Icon(Icons.Filled.Paid, "Collection value") }
                     IconButton(onClick = onStats) { Icon(Icons.Filled.BarChart, "Stats") }
                     IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "Settings") }

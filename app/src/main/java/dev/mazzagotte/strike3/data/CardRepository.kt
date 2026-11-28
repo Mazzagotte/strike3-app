@@ -1,7 +1,14 @@
 package dev.mazzagotte.strike3.data
 
 import dev.mazzagotte.strike3.util.CardText
+import dev.mazzagotte.strike3.util.CardPrint
+import dev.mazzagotte.strike3.render.EditParams
+import dev.mazzagotte.strike3.render.PhotoTools
+import dev.mazzagotte.strike3.render.SourceStore
 import android.content.Context
+import android.graphics.Bitmap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,12 +34,14 @@ class CardRepository(private val context: Context) {
     suspend fun add(card: Card): Long {
         val id = dao.insert(card)
         scheduleBackup()
+        ensurePrints()
         return id
     }
 
     suspend fun update(card: Card) {
         dao.update(card)
         scheduleBackup()
+        ensurePrints()
     }
 
     suspend fun delete(card: Card) {
@@ -45,11 +54,60 @@ class CardRepository(private val context: Context) {
         dao.insertAll(plan.updated)
         plan.added.forEach { dao.insert(it) }
         scheduleBackup()
+        ensurePrints()
     }
 
     suspend fun restore(cards: List<Card>) {
         dao.insertAll(cards)
         scheduleBackup()
+        ensurePrints()
+    }
+
+    private val printLock = Mutex()
+    private val printsWanted = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Makes the photo fingerprints for "Do I have this?" on any card that doesn't have them yet, or
+     * whose photos changed. Runs in the background; about a tenth of a second per card.
+     */
+    fun ensurePrints() {
+        scope.launch {
+            printsWanted.set(true)
+            if (printLock.isLocked) return@launch // a pass is running; it goes round again
+            printLock.withLock {
+                var again = true
+                while (again || printsWanted.getAndSet(false)) {
+                    again = false
+                    for (c in dao.allNow()) {
+                        val key = printKeyOf(c)
+                        if (c.printKey == key) continue
+                        val front = runCatching { frontPrint(c) }.getOrNull()
+                        val back = runCatching { photoPrint(SourceStore.loadScaled(c.backPath, 500)) }.getOrNull()
+                        // Re-read just before writing, so an edit made meanwhile isn't lost
+                        val fresh = dao.getById(c.id) ?: continue
+                        if (printKeyOf(fresh) != key) { again = true; continue }
+                        dao.update(fresh.copy(frontPrint = CardPrint.encode(front), backPrint = CardPrint.encode(back), printKey = key))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun printKeyOf(c: Card) =
+        listOf(c.cutoutPath, c.sourcePath, EditParams.fromJson(c.editParams).rotation.toString(), c.backPath, "v1").joinToString("|")
+
+    private fun frontPrint(c: Card): ByteArray? {
+        // The front photo turned the way it was set (framed like a "Do I have this?" photo), else the cut-out
+        val turn = EditParams.fromJson(c.editParams).rotation
+        SourceStore.loadScaled(c.sourcePath, 500)?.let { return photoPrint(PhotoTools.rotate(it, turn)) }
+        return photoPrint(SourceStore.loadScaled(c.cutoutPath, 500))
+    }
+
+    private fun photoPrint(bmp: Bitmap?): ByteArray? {
+        bmp ?: return null
+        val px = IntArray(bmp.width * bmp.height)
+        bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+        return CardPrint.of(px, bmp.width, bmp.height)
     }
 
     /** Writes the Drive backup a moment after the last change, so quick edits make one write. */

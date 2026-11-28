@@ -13,5 +13,6 @@ class Strike3App : Application() {
         repo.backfillCardNumbers()
         repo.printRunsOnly()
         repo.flagParallelMismatches()
+        repo.ensurePrints()
     }
 }
