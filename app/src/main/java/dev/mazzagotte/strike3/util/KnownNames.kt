@@ -31,7 +31,14 @@ object KnownNames {
             }
             if (best != null && best.second >= 0.999) break // exact match, stop looking
         }
-        return best?.first
+        best?.first?.let { return it }
+        // "JUDGE, A. OF": last name and first initial, when exactly one known player fits
+        val flat = lines.joinToString("\n")
+        val m = Regex("""\b([A-Za-z'’-]{3,}),\s*([A-Z])\.""").find(flat) ?: return null
+        val last = norm(m.groupValues[1]); val initial = m.groupValues[2][0]
+        return names.filter { (_, w) -> w.last() == last || (w.size >= 3 && w[w.size - 2] == last) }
+            .filter { (_, w) -> w.first().first() == initial }
+            .map { it.first }.singleOrNull()
     }
 
     /** Highest similarity between [name] and any run of the same number of words in [row]; 0 if below the bar. */

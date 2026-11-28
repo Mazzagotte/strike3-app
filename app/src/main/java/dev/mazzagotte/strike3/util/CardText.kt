@@ -171,7 +171,8 @@ object CardText {
         // "No. 26 in the 2005 Series"
         Regex("""((?:19[5-9]|20[0-4])\d)\s+series\b""", RegexOption.IGNORE_CASE).find(all)?.let { return YearGuess(it.groupValues[1], false) }
         // Otherwise the year mentioned most (latest wins a tie), skipping birth/draft/debut and design years
-        val years = cleanYears(lines).filter { it <= Year.now().value + 1 && it != designYear }
+        // No card carries a year that hasn't started yet; "2027" was a misread "2021"
+        val years = cleanYears(lines).filter { it <= Year.now().value && it != designYear }
         return years.groupingBy { it }.eachCount().entries
             .maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenBy { it.key })
             ?.let { YearGuess(it.key.toString(), false) }
@@ -263,12 +264,26 @@ object CardText {
         // "BCP-139", "SCBA-AV", "90A-AV", "RS-DM", "T-5B"
         val dashed = Regex("""(?<![A-Za-z0-9-])([A-Z0-9]{1,5}[A-Z])-([A-Z0-9]{1,5})(?![A-Za-z0-9-])""").findAll(text)
             .firstOrNull { m -> m.groupValues[1] !in NOT_CODES && m.groupValues[1].any { it.isLetter() } && (m.groupValues[2].any { it.isDigit() } || m.groupValues[2].length in 2..4) }
-        val plain = Regex("""(?<![A-Za-z0-9-])(USC|US|UHC|HC|HE|ASGC|NYY|EG|FF)\s?-?(\d{1,3})(?![\d])""").find(text)
+        // Not on a height/weight line: "HT: 6'7\" WT: 275" was being read as Topps Holiday HE67
+        val plain = Regex("""(?<![A-Za-z0-9-])(USC|US|UHC|HC|HE|ASGC|NYY|EG|FF)\s?-?(\d{1,3})(?![\d'’"″])""").findAll(text)
+            .firstOrNull { m -> !BIO_LINE.containsMatchIn(lineAround(text, m.range.first)) }
         val m = dashed ?: plain ?: return null
         val prefix = m.groupValues[1]
         val code = if (m == plain) "$prefix${m.groupValues[2]}" else "$prefix-${m.groupValues[2]}"
         val info = CODES[prefix]
         return FoundCode(code, info?.set, info?.insert, info?.sure ?: false)
+    }
+
+    private val BIO_LINE = Regex("""\b(WT|WEIGHT|BATS|THROWS|BORN|HT)\b""", RegexOption.IGNORE_CASE)
+
+    private fun lineAround(text: String, from: Int): String {
+        if (text.isEmpty()) return ""
+        // A match may begin on the newline before its line; look from the first character after it
+        var at = from.coerceIn(0, text.length - 1)
+        while (at < text.length - 1 && text[at] == '\n') at++
+        val start = text.lastIndexOf('\n', at - 1).let { if (it < 0) 0 else it + 1 }
+        val end = text.indexOf('\n', at).let { if (it < 0) text.length else it }
+        return text.substring(start, end)
     }
 
     // ---------- 4. Player name ----------
@@ -305,6 +320,9 @@ object CardText {
         "FROM", "WITH", "BATTING", "PITCHING", "FIELDING", "CAREER", "HITS", "HOME", "RUNS", "ARTWORK", "BY", "REFRACTOR",
         "PRIZM", "SELECT", "SCORE", "LEAF", "PACIFIC", "GOLD", "SILVER", "RED", "BLUE", "GREEN", "ORANGE", "PURPLE",
         "BLACK", "WHITE", "BEST", "MY", "TOP", "FUTURES", "GAME", "CANVAS", "REPRODUCTION", "TRIBUTE", "ICONS",
+        // Stat-table headings ("HR RBI SB BB" was taken for a name)
+        "HR", "RBI", "SB", "BB", "AB", "AVG", "OBP", "SLG", "OPS", "ERA", "WAR", "SO", "CS", "IP", "WHIP", "GS", "SV",
+        "DIAMOND", "TAROT",
     )
 
     private val SUFFIXES = setOf("JR", "JR.", "SR", "SR.", "II", "III", "IV")
@@ -370,7 +388,10 @@ object CardText {
 
     /** "#287", "No. 287", "Card No. 26" -> "287" (only these explicit forms; bare numbers are too often stats). */
     fun plainNumber(text: String): String? =
-        Regex("""(?:^|[\s(])(?:#|no\.?\s?|card\s+no\.?\s?)\s?(\d{1,4}[A-Z]?)\b""", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)
+        Regex("""(?:^|[\s(])(?:#|no\.?\s?|card\s+no\.?\s?)\s?(\d{1,4}[A-Z]?)\b(?![-–])""", RegexOption.IGNORE_CASE).findAll(text)
+            // "DRAFTED: YANKEES #1-JUNE, 2013" is a draft round, not the card number
+            .firstOrNull { m -> !Regex("""draft""", RegexOption.IGNORE_CASE).containsMatchIn(lineAround(text, m.range.first)) }
+            ?.groupValues?.get(1)
 
     /** Card number found in any text (e.g. Notes): a code like TOTD-22 first, then "#287". */
     fun cardNumberIn(text: String): String? = cardCode(text)?.code ?: plainNumber(text)
@@ -552,8 +573,10 @@ object CardText {
         "99" to "Green Refractor", "75" to "Yellow Refractor", "50" to "Gold Refractor", "25" to "Orange Refractor",
         "10" to "Black Refractor", "5" to "Red Refractor", "1" to "Superfractor",
     )
+    // Paper Bowman borders (2024-25 checklists): Sky Blue /499 ... Red /5
     private val PAPER = mapOf(
-        "499" to "Purple", "399" to "Neon Green", "250" to "Purple", "150" to "Blue", "99" to "Green", "75" to "Yellow", "50" to "Gold",
+        "499" to "Sky Blue", "399" to "Neon Green", "299" to "Fuchsia", "250" to "Purple", "199" to "Purple Pattern",
+        "175" to "Pink", "150" to "Blue", "125" to "Blue Pattern", "99" to "Green", "75" to "Yellow", "50" to "Gold",
         "25" to "Orange", "10" to "Black", "5" to "Red", "1" to "Platinum 1/1",
     )
 
