@@ -51,7 +51,7 @@ object PhotoExport {
                     JSONObject().apply {
                         put("id", c.id)
                         put("player", c.player); put("year", c.year); put("set", c.setName)
-                        put("cardNumber", c.cardNumber); put("parallel", c.parallel); put("serial", c.serial)
+                        put("cardNumber", c.cardNumber); put("scanText", c.scanText); put("parallel", c.parallel); put("serial", c.serial)
                         put("team", c.team); put("auto", c.isAuto); put("rookie", c.isRookie); put("relic", c.isPatch)
                         put("notes", c.notes)
                         put("unsure", JSONArray(c.unsure.sorted()))

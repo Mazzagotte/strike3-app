@@ -58,7 +58,7 @@ object CardReader {
         }
         val notes = (listOf(card.notes) + g.notes.filter { n -> !card.notes.contains(n, ignoreCase = true) && before?.notes?.contains(n) != true })
             .filter { it.isNotBlank() }.joinToString("; ")
-        return card.copy(
+        val out = card.copy(
             player = pick(CardText.F.PLAYER, card.player, before?.player, g.player),
             year = pick(CardText.F.YEAR, card.year, before?.year, g.year),
             setName = pick(CardText.F.SET, card.setName, before?.setName, g.setName),
@@ -70,7 +70,11 @@ object CardReader {
             isRookie = card.isRookie || g.isRookie,
             isPatch = card.isPatch || g.isRelic,
             notes = notes,
-        ).withUnsure(unsure)
+            scanText = g.scanText.ifBlank { card.scanText },
+        )
+        // A parallel that doesn't fit the print run (Gold on a /99 Bowman Chrome) gets marked to check
+        if (CardText.parallelConflicts(out.setName, out.serial, out.parallel)) unsure += CardText.F.PARALLEL
+        return out.withUnsure(unsure)
     }
 
     /**

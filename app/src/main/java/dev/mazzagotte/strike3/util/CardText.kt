@@ -45,6 +45,10 @@ object CardText {
         val unsure: Set<String> = emptySet(),
         /** Print run from the serial ("199"), for naming the parallel. */
         val printRun: String = "",
+        /** The set a known card code points to ("PD-41" -> Topps Pro Debut), when the code is sure of it. */
+        val codeSet: String = "",
+        /** Everything the reader saw, kept on the card (see [joinScan]). */
+        val scanText: String = "",
     ) {
         val found: List<String>
             get() = listOfNotNull(
@@ -158,7 +162,7 @@ object CardText {
 
     private data class YearGuess(val year: String, val sure: Boolean)
 
-    private fun year(lines: List<String>, all: String): YearGuess? {
+    private fun year(lines: List<String>, all: String, designYear: Int? = null): YearGuess? {
         COPYRIGHT.find(all)?.let { return YearGuess(it.groupValues[1], true) }
         COMPANY_YEAR.find(all)?.let { m ->
             if (!NOT_CARD_YEAR.containsMatchIn(all.substring(0, m.range.first).takeLast(40))) return YearGuess(m.groupValues[1], false)
@@ -167,7 +171,7 @@ object CardText {
         // "No. 26 in the 2005 Series"
         Regex("""((?:19[5-9]|20[0-4])\d)\s+series\b""", RegexOption.IGNORE_CASE).find(all)?.let { return YearGuess(it.groupValues[1], false) }
         // Otherwise the year mentioned most (latest wins a tie), skipping birth/draft/debut and design years
-        val years = cleanYears(lines).filter { it <= Year.now().value + 1 }
+        val years = cleanYears(lines).filter { it <= Year.now().value + 1 && it != designYear }
         return years.groupingBy { it }.eachCount().entries
             .maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenBy { it.key })
             ?.let { YearGuess(it.key.toString(), false) }
@@ -223,7 +227,32 @@ object CardText {
         "AN" to Code("Leaf", "Anime Nation", false),
         "MI" to Code("Leaf Metal", "Metallic Imaginations", false),
         "PP" to Code(null, "Insert"),
+        // Added after checking a 231-card collection against checklists
+        "BD" to Code("Bowman Draft", "Bowman Draft"),
+        "BDC" to Code("Bowman Draft", "Bowman Draft Chrome"),
+        "HOC" to Code(null, "Heart of the City"),
+        "FF" to Code("Donruss", "Franchise Features", false),
+        "EG" to Code(null, "Eyes of the Game"),
+        "PG" to Code(null, "Portrait Gallery"),
+        "T90R" to Code("Topps", "1990 Topps Relics", false),
+        "T90" to Code("Topps", "1990 Topps design", false),
+        "87T" to Code(null, "1987 Topps design"),
+        "PDAR" to Code("Topps Pristine", "Popular Demand Autograph Relic", false),
+        "DPAR" to Code("Topps Pristine", "Popular Demand Autograph Relic", false),
+        "PPDAR" to Code("Topps Pristine", "Popular Demand Autograph Relic", false),
+        // "MIB" is often read as "M1B"
+        "M1B" to Code(null, "My 1st Bowman"),
     )
+
+    /**
+     * Codes from inserts that copy an old design carry that design's year: 87T-8 (1987), 90AS-12 and
+     * T90R-AV (1990), 89B2-7 (1989). That year is printed all over the back and is never the card's year.
+     */
+    fun designYear(code: String?): Int? {
+        val prefix = code?.substringBefore('-') ?: return null
+        val yy = Regex("""^T?(\d{2})(?=[A-Z]|$)""").find(prefix)?.groupValues?.get(1)?.toInt() ?: return null
+        return if (yy >= 50) 1900 + yy else 2000 + yy
+    }
 
     /** Hyphen words that look like codes but aren't. */
     private val NOT_CODES = setOf("ALL", "HIGH", "DOUBLE", "TRIPLE", "SINGLE", "T", "NON", "X", "SIX", "FIVE", "FOUR", "THREE", "TWO", "ONE", "WORLD", "MLB", "AL", "NL", "LOW", "MID", "E", "ON", "AT", "CO", "RE", "PRE", "POST", "SELF", "ANTI", "SEMI", "MULTI", "WALK", "GO", "HIT")
@@ -234,7 +263,7 @@ object CardText {
         // "BCP-139", "SCBA-AV", "90A-AV", "RS-DM", "T-5B"
         val dashed = Regex("""(?<![A-Za-z0-9-])([A-Z0-9]{1,5}[A-Z])-([A-Z0-9]{1,5})(?![A-Za-z0-9-])""").findAll(text)
             .firstOrNull { m -> m.groupValues[1] !in NOT_CODES && m.groupValues[1].any { it.isLetter() } && (m.groupValues[2].any { it.isDigit() } || m.groupValues[2].length in 2..4) }
-        val plain = Regex("""(?<![A-Za-z0-9-])(USC|US|UHC|HC|HE|ASGC|NYY)\s?-?(\d{1,3})(?![\d])""").find(text)
+        val plain = Regex("""(?<![A-Za-z0-9-])(USC|US|UHC|HC|HE|ASGC|NYY|EG|FF)\s?-?(\d{1,3})(?![\d])""").find(text)
         val m = dashed ?: plain ?: return null
         val prefix = m.groupValues[1]
         val code = if (m == plain) "$prefix${m.groupValues[2]}" else "$prefix-${m.groupValues[2]}"
@@ -384,7 +413,7 @@ object CardText {
         val y = when {
             slab?.year != null -> slab.year to true
             from != null -> from.year to true
-            else -> year(lines, all)?.let { it.year to it.sure }
+            else -> year(lines, all, designYear(code?.code))?.let { it.year to it.sure }
         }
         if (y != null && !y.second) unsure += F.YEAR
 
@@ -392,6 +421,9 @@ object CardText {
         var set = slab?.set ?: from?.set
         if (set == null && code?.set != null) { set = code.set; if (!code.sure) unsure += F.SET }
         if (set == null) knownSetIn(flat)?.let { set = it; unsure += F.SET }
+        // "Topps" from a logo or a "from 2023 Topps Baseball" line, but the code says Topps Pro Debut
+        val codeSet = code?.set?.takeIf { code.sure }
+        if (codeSet != null && set != codeSet && set != null && codeSet.startsWith(set!!, ignoreCase = true)) set = codeSet
 
         val serial = serial(all)
         if (serial != null) unsure += F.SERIAL
@@ -424,7 +456,21 @@ object CardText {
             notes = notes,
             unsure = unsure,
             printRun = serial?.substringAfter('/')?.trimStart('0').orEmpty(),
+            codeSet = codeSet.orEmpty(),
         )
+    }
+
+    private const val BACK_MARK = "---BACK---"
+
+    /** The front's and back's text as one string to keep on the card. */
+    fun joinScan(frontLines: List<String>, backLines: List<String>): String =
+        if (frontLines.isEmpty() && backLines.isEmpty()) "" else (frontLines + BACK_MARK + backLines).joinToString("\n")
+
+    /** Saved text back into (front lines, back lines), to read a saved card again with newer rules. */
+    fun splitScan(text: String): Pair<List<String>, List<String>> {
+        val lines = text.lines()
+        val i = lines.indexOf(BACK_MARK)
+        return if (i < 0) lines to emptyList() else lines.take(i) to lines.drop(i + 1)
     }
 
     /**
@@ -455,6 +501,11 @@ object CardText {
 
         val year = pick(F.YEAR, b.year, f.year)
         var set = pick(F.SET, b.setName, f.setName)
+        // The front's logo says "Topps" but the back's code says Topps Pro Debut: the code wins
+        val codeSet = b.codeSet.ifBlank { f.codeSet }
+        if (codeSet.isNotBlank() && set != codeSet && (set.isBlank() || codeSet.startsWith(set, ignoreCase = true))) {
+            set = codeSet; unsure -= F.SET
+        }
         // "Bowman Briefing" on the back + "Chrome" logo on the front = Bowman Chrome
         if ((set == "Bowman" || set == "Topps") && (frontLines + backLines).any { Regex("""\bchrome\b""", RegexOption.IGNORE_CASE).containsMatchIn(it) }) {
             set = "$set Chrome"; unsure += F.SET
@@ -483,6 +534,8 @@ object CardText {
             notes = (b.notes + f.notes).distinct(),
             unsure = unsure,
             printRun = run,
+            codeSet = codeSet,
+            scanText = joinScan(frontLines, backLines),
         )
     }
 
@@ -495,12 +548,12 @@ object CardText {
         "50" to "Gold Refractor", "25" to "Orange Refractor", "10" to "Black Refractor", "5" to "Red Refractor", "1" to "Superfractor",
     )
     private val TOPPS_CHROME = mapOf(
-        "499" to "Refractor", "299" to "Purple Refractor", "250" to "Purple Refractor", "199" to "Aqua Refractor", "150" to "Blue Refractor",
+        "499" to "Refractor", "299" to "Purple Refractor", "199" to "Aqua Refractor", "150" to "Blue Refractor",
         "99" to "Green Refractor", "75" to "Yellow Refractor", "50" to "Gold Refractor", "25" to "Orange Refractor",
         "10" to "Black Refractor", "5" to "Red Refractor", "1" to "Superfractor",
     )
     private val PAPER = mapOf(
-        "499" to "Purple", "250" to "Purple", "150" to "Blue", "99" to "Green", "75" to "Yellow", "50" to "Gold",
+        "499" to "Purple", "399" to "Neon Green", "250" to "Purple", "150" to "Blue", "99" to "Green", "75" to "Yellow", "50" to "Gold",
         "25" to "Orange", "10" to "Black", "5" to "Red", "1" to "Platinum 1/1",
     )
 
@@ -525,13 +578,37 @@ object CardText {
         }
         val name = table[printRun] ?: return null
         if (printRun == "1") return name
-        val nameColor = name.substringBefore(' ').takeIf { it != "Refractor" && it != "Speckle" }
+        val nameColor = colorIn(name)
         return when {
             nameColor == null -> name.takeIf { borderColor == null } // plain Refractor: silver border, no color
             borderColor == null -> null
             nameColor in (COLOR_FAMILY[borderColor] ?: setOf(borderColor)) -> name
             else -> null
         }
+    }
+
+    private val COLORS = listOf("Purple", "Fuchsia", "Pink", "Blue", "Aqua", "Green", "Yellow", "Gold", "Orange", "Red", "Black", "Bronze")
+
+    /** The color word in a parallel name: "Neon Green" -> Green, "Gold Refractor" -> Gold, "Refractor" -> null. */
+    private fun colorIn(name: String): String? = name.split(' ').firstOrNull { it in COLORS }
+
+    /**
+     * True when a parallel's color doesn't fit the card's print run, e.g. "Gold Refractor" on a /99
+     * Bowman Chrome (Gold is /50; /99 is Green). Only for sets whose print runs we know, and only
+     * when both have a color, so a typed name we don't recognize is left alone.
+     */
+    fun parallelConflicts(set: String, serial: String, parallel: String): Boolean {
+        val run = serial.substringAfter('/', "").trimStart('0')
+        if (run.isBlank() || run == "1" || parallel.isBlank()) return false
+        val table = when {
+            set.contains("Bowman", true) && (set.contains("Chrome", true) || set.contains("Best", true)) -> BOWMAN_CHROME
+            set.contains("Chrome", true) -> TOPPS_CHROME
+            set.contains("Bowman", true) -> PAPER
+            else -> return false
+        }
+        val expected = table[run]?.let(::colorIn) ?: return false
+        val typed = parallel.split(' ').map { w -> w.replaceFirstChar { it.uppercase() } }.firstOrNull { it in COLORS } ?: return false
+        return typed !in (COLOR_FAMILY[expected] ?: setOf(expected))
     }
 
     private fun editDistance(a: String, b: String): Int {

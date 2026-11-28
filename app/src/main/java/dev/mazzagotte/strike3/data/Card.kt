@@ -51,6 +51,9 @@ data class Card(
     val needsReview: Boolean = false,
     /** The card's number/code as printed, e.g. "TOTD-22", "BCP-139", "US325", "287". */
     val cardNumber: String = "",
+    /** Text the reader saw on the photos (front, then back after a "---BACK---" line), kept so
+     *  reader fixes can be re-run on saved cards without new photos. Not shown in the app. */
+    val scanText: String = "",
     /** Fields the card reader guessed and you haven't checked yet ("year,serial"). */
     val unsureFields: String = "",
 ) {
@@ -97,7 +100,7 @@ interface CardDao {
     suspend fun delete(card: Card)
 }
 
-@Database(entities = [Card::class], version = 5, exportSchema = false)
+@Database(entities = [Card::class], version = 6, exportSchema = false)
 abstract class AppDb : RoomDatabase() {
     abstract fun cards(): CardDao
 
@@ -129,9 +132,15 @@ abstract class AppDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE cards ADD COLUMN scanText TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun create(context: Context): AppDb =
             Room.databaseBuilder(context, AppDb::class.java, "strike3.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
     }
 }

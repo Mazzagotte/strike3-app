@@ -12,5 +12,6 @@ class Strike3App : Application() {
         repo = CardRepository(this)
         repo.backfillCardNumbers()
         repo.printRunsOnly()
+        repo.flagParallelMismatches()
     }
 }

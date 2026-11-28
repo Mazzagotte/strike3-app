@@ -88,6 +88,25 @@ class CardRepository(private val context: Context) {
         }
     }
 
+    /**
+     * One time: mark the parallel to check on saved cards where it doesn't fit the print run
+     * (a "Gold" /99 Bowman Chrome). Only the check mark changes, never the parallel itself.
+     */
+    fun flagParallelMismatches() {
+        val prefs = context.getSharedPreferences("migrations", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("parallelMismatch", false)) return
+        scope.launch {
+            val changed = dao.allNow().filter { c ->
+                CardText.F.PARALLEL !in c.unsure && CardText.parallelConflicts(c.setName, c.serial, c.parallel)
+            }.map { it.withUnsure(it.unsure + CardText.F.PARALLEL) }
+            if (changed.isNotEmpty()) {
+                dao.insertAll(changed)
+                scheduleBackup()
+            }
+            prefs.edit().putBoolean("parallelMismatch", true).apply()
+        }
+    }
+
     fun scheduleBackup() {
         backupJob?.cancel()
         backupJob = scope.launch {

@@ -105,6 +105,7 @@ object DriveBackup {
                     put("needsReview", card.needsReview)
                     put("unsureFields", card.unsureFields)
                     put("cardNumber", card.cardNumber)
+                    put("scanText", card.scanText)
                     put("posted", card.posted)
                     put("notes", card.notes)
                     put("postUri", card.postUri ?: JSONObject.NULL)
@@ -133,6 +134,7 @@ object DriveBackup {
         needsReview = o.optBoolean("needsReview"),
         unsureFields = o.optString("unsureFields"),
         cardNumber = o.optString("cardNumber"),
+        scanText = o.optString("scanText"),
         posted = o.optBoolean("posted"),
         notes = o.optString("notes"),
         postUri = if (o.isNull("postUri")) null else o.optString("postUri"),
