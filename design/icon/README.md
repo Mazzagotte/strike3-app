@@ -1,11 +1,11 @@
 # App icon
 
-Fanned hand of three cards: two brushed-chrome cards behind a gold refractor with an embossed
-backwards K (the scorebook mark for a called third strike).
+The III bars (silver, silver, gold — the same mark as the post template) in brushed chrome and
+gold foil, inside a single gold-framed card on near-black.
 
-- `make.py` writes `fg.svg` (transparent, 108dp adaptive-icon canvas; art inside the 66dp safe circle).
-  `python3 make.py 0.8 0.6` (the numbers nudge the art to the optical center).
-- `shot.py fg.svg` renders it to `fg.png` (1024 px) with headless Chrome, which handles the SVG
-  filters and blend modes. Resize that to `mipmap-*/ic_launcher_foreground.png`
-  (108, 162, 216, 324, 432 px).
-- `mono.py` writes `drawable/ic_launcher_foreground.xml`, the one-color themed icon, from the same geometry.
+- `barsicon.py` writes `full_D.svg` / `fg_D.svg` (option D; `fg` is transparent, the 108dp
+  adaptive-icon canvas with the art scaled 0.94 to sit in the 66dp safe circle). It takes the
+  gradients and filters from `make.py` (the earlier fanned-cards icon, kept for reference).
+- `shot.py fg_D.svg` renders it to a 1024 px PNG with headless Chrome (needed for the SVG
+  filters and blend modes). Resize to `mipmap-*/ic_launcher_foreground.png` (108, 162, 216, 324, 432 px).
+- `mono.py` writes `drawable/ic_launcher_foreground.xml`, the one-color themed icon (card outline + bars).
