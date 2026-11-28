@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 108 108"><defs>
+<linearGradient id="chromeA" x1="0" y1="0" x2="1" y2="1">
+ <stop offset="0" stop-color="#8A9098"/><stop offset=".22" stop-color="#E9ECEF"/><stop offset=".38" stop-color="#A6ACB4"/>
+ <stop offset=".55" stop-color="#F7F8FA"/><stop offset=".72" stop-color="#9AA0A8"/><stop offset="1" stop-color="#5F656D"/></linearGradient>
+<linearGradient id="chromeB" x1="0" y1="0" x2="1" y2="1">
+ <stop offset="0" stop-color="#D8DCE0"/><stop offset=".3" stop-color="#FFFFFF"/><stop offset=".46" stop-color="#B3B9C1"/>
+ <stop offset=".62" stop-color="#EEF0F3"/><stop offset=".8" stop-color="#A3A9B1"/><stop offset="1" stop-color="#737981"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+ <stop offset="0" stop-color="#8E6414"/><stop offset=".18" stop-color="#F3D27A"/><stop offset=".36" stop-color="#C9961F"/>
+ <stop offset=".52" stop-color="#FCE7A2"/><stop offset=".7" stop-color="#D1A12E"/><stop offset="1" stop-color="#7A5410"/></linearGradient>
+<linearGradient id="kfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A3780F"/><stop offset="1" stop-color="#6E4C08"/></linearGradient>
+<linearGradient id="rainbow" x1="0" y1="1" x2="1" y2="0">
+ <stop offset="0" stop-color="#ff5f6d"/><stop offset=".2" stop-color="#ffc371"/><stop offset=".4" stop-color="#9cff8a"/>
+ <stop offset=".6" stop-color="#5fd3ff"/><stop offset=".8" stop-color="#b77dff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient>
+<linearGradient id="streak" x1="0" y1="0" x2="1" y2="1">
+ <stop offset=".30" stop-color="#fff" stop-opacity="0"/><stop offset=".42" stop-color="#fff" stop-opacity=".55"/>
+ <stop offset=".47" stop-color="#fff" stop-opacity=".15"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#fff" stop-opacity=".15"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<radialGradient id="vig" cx=".35" cy=".25" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></radialGradient>
+<filter id="drop" x="-40%" y="-40%" width="180%" height="180%">
+ <feGaussianBlur in="SourceAlpha" stdDeviation="1.3"/><feOffset dx="0.4" dy="1.4"/><feComponentTransfer><feFuncA type="linear" slope=".65"/></feComponentTransfer>
+ <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="brush" x="0" y="0" width="100%" height="100%">
+ <feTurbulence type="fractalNoise" baseFrequency="0.04 1.6" numOctaves="2" seed="3"/><feColorMatrix type="saturate" values="0"/>
+ <feComponentTransfer><feFuncA type="linear" slope="0" intercept=".16"/></feComponentTransfer></filter>
+<filter id="foil" x="0" y="0" width="100%" height="100%">
+ <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="9"/>
+ <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 2.6 -1.75"/></filter>
+</defs><g transform="translate(0.8,0.6)" style="isolation:isolate"><g transform="rotate(-20 54 82)">
+  <clipPath id="ca"><rect x="42.0" y="33" width="24" height="33.6" rx="1.7"/></clipPath>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="url(#chromeA)" filter="url(#drop)"/>
+  <g clip-path="url(#ca)"><rect x="42.0" y="33" width="24" height="33.6" filter="url(#brush)" style="mix-blend-mode:multiply"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#streak)"/><rect x="45.2" y="36.2" width="17.6" height="22.6" rx=".6" fill="#000" opacity=".07"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#vig)"/></g>
+  <rect x="43.7" y="34.7" width="20.6" height="30.200000000000003" rx="0.9" fill="none" stroke="#F2F4F6" stroke-width="0.45"/>
+  <rect x="42.15" y="33.15" width="23.7" height="33.300000000000004" rx="1.6" fill="none" stroke="url(#edge)" stroke-width="0.3"/>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="none" stroke="#4E535A" stroke-width="0.25"/>
+</g><g transform="rotate(-2 54 82)">
+  <clipPath id="cb"><rect x="42.0" y="33" width="24" height="33.6" rx="1.7"/></clipPath>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="url(#chromeB)" filter="url(#drop)"/>
+  <g clip-path="url(#cb)"><rect x="42.0" y="33" width="24" height="33.6" filter="url(#brush)" style="mix-blend-mode:multiply"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#streak)"/><rect x="45.2" y="36.2" width="17.6" height="22.6" rx=".6" fill="#000" opacity=".07"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#vig)"/></g>
+  <rect x="43.7" y="34.7" width="20.6" height="30.200000000000003" rx="0.9" fill="none" stroke="#FFFFFF" stroke-width="0.45"/>
+  <rect x="42.15" y="33.15" width="23.7" height="33.300000000000004" rx="1.6" fill="none" stroke="url(#edge)" stroke-width="0.3"/>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="none" stroke="#5E636A" stroke-width="0.25"/>
+</g><g transform="rotate(16 54 82)">
+  <clipPath id="cg"><rect x="42.0" y="33" width="24" height="33.6" rx="1.7"/></clipPath>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="url(#gold)" filter="url(#drop)"/>
+  <g clip-path="url(#cg)"><rect x="42.0" y="33" width="24" height="33.6" fill="url(#rainbow)" opacity=".2" style="mix-blend-mode:soft-light"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#rainbow)" opacity=".07" style="mix-blend-mode:color-dodge"/><rect x="42.0" y="33" width="24" height="33.6" filter="url(#foil)" opacity=".28" style="mix-blend-mode:screen"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#streak)"/><rect x="42.0" y="33" width="24" height="33.6" fill="url(#vig)"/></g>
+  <rect x="43.7" y="34.7" width="20.6" height="30.200000000000003" rx="0.9" fill="none" stroke="#FFF3C9" stroke-width="0.45"/>
+  <rect x="42.15" y="33.15" width="23.7" height="33.300000000000004" rx="1.6" fill="none" stroke="url(#edge)" stroke-width="0.3"/>
+  <rect x="42.0" y="33" width="24" height="33.6" rx="1.7" fill="none" stroke="#6E4C08" stroke-width="0.25"/>
+<path d="M0,0 h3.2 v18 h-3.2 z M3.2,8.4 L12.6,0 h4 l-10,9.3 z M3.2,9.4 L13,18 h-4 L3.2,11.6 z" fill="#5A3C06" transform="translate(60.694,43.26) scale(-0.78,0.78)" opacity=".75"/><path d="M0,0 h3.2 v18 h-3.2 z M3.2,8.4 L12.6,0 h4 l-10,9.3 z M3.2,9.4 L13,18 h-4 L3.2,11.6 z" fill="#FFF0B8" transform="translate(60.31400000000001,42.8) scale(-0.78,0.78)" opacity=".85"/><path d="M0,0 h3.2 v18 h-3.2 z M3.2,8.4 L12.6,0 h4 l-10,9.3 z M3.2,9.4 L13,18 h-4 L3.2,11.6 z" fill="url(#kfill)" transform="translate(60.474000000000004,42.98) scale(-0.78,0.78)" /></g></g></svg>

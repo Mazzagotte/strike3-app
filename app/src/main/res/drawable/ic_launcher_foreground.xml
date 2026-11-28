@@ -1,19 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fanned hand of three cards: silver, silver, gold. 108dp adaptive icon, art kept in the 66dp safe zone. -->
+<!-- Themed (monochrome) icon: the fanned hand of three cards with small gaps between them and the
+     backwards K cut out of the front one. Made by design/icon/mono.py from the same geometry as the
+     full-color icon (mipmap/ic_launcher_foreground, rendered by design/icon/make.py). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:pivotX="54" android:pivotY="84" android:rotation="-18">
-        <path android:fillColor="#FFB9BEC6" android:pathData="M45,31 h18 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-18 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z" />
-    </group>
-    <group android:pivotX="54" android:pivotY="84" android:rotation="0">
-        <path android:fillColor="#FFDDE1E6" android:pathData="M45,31 h18 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-18 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z" />
-    </group>
-    <group android:pivotX="54" android:pivotY="84" android:rotation="18">
-        <path android:fillColor="#FFD4A531" android:pathData="M45,31 h18 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-18 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z" />
-        <!-- backwards K -->
-        <path android:fillColor="#FF5E410C" android:pathData="M58.5,38 h2.6 v16 h-2.6 z M58.5,46.6 L50.2,38 h3.4 l7.2,7.6 z M58.5,45.4 L50,54 h3.4 l7.4,-7.4 z" />
-    </group>
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M57.53,32.64 L57.11,32.81 L56.76,33.07 L56.48,33.42 L56.30,33.82 L47.98,62.85 L47.91,63.29 L47.96,63.73 L48.13,64.15 L48.39,64.50 L48.74,64.78 L49.14,64.96 L68.95,70.64 L69.38,70.70 L69.83,70.65 L70.24,70.49 L70.60,70.22 L70.87,69.88 L71.05,69.47 L79.37,40.44 L79.44,40.00 L79.39,39.56 L79.23,39.15 L78.96,38.79 L78.61,38.51 L78.21,38.34 L58.41,32.66 L57.97,32.59 z M67.91,60.37 L65.51,59.68 L66.89,54.89 L61.16,58.44 L58.16,57.58 L67.36,53.24 L67.57,52.49 L69.38,46.19 L71.78,46.88 z M64.83,52.43 L59.33,43.31 L62.33,44.17 L67.57,52.49 z M41.95,34.25 L41.61,34.53 L41.35,34.89 L41.20,35.31 L41.16,35.75 L42.21,65.93 L42.28,66.37 L42.47,66.77 L42.75,67.11 L43.11,67.37 L43.53,67.53 L43.97,67.57 L52.50,67.27 L48.79,66.21 L48.63,66.15 L48.22,65.97 L48.12,65.92 L48.02,65.86 L47.93,65.80 L47.58,65.52 L47.49,65.45 L47.42,65.37 L47.34,65.28 L47.08,64.92 L47.02,64.83 L46.96,64.73 L46.92,64.62 L46.75,64.21 L46.72,64.10 L46.69,63.99 L46.67,63.88 L46.62,63.44 L46.61,63.33 L46.62,63.21 L46.63,63.10 L46.69,62.66 L46.73,62.50 L55.03,33.56 L42.80,33.99 L42.36,34.06 z  M27.64,40.58 L27.40,40.96 L27.27,41.38 L27.25,41.82 L27.35,42.26 L37.68,70.64 L37.88,71.03 L38.18,71.36 L38.55,71.59 L38.98,71.73 L39.42,71.75 L39.85,71.65 L47.87,68.73 L44.01,68.87 L43.84,68.86 L43.40,68.82 L43.29,68.80 L43.18,68.78 L43.07,68.74 L42.66,68.59 L42.55,68.54 L42.45,68.49 L42.36,68.43 L42.00,68.17 L41.91,68.10 L41.82,68.02 L41.75,67.94 L41.46,67.60 L41.40,67.51 L41.34,67.41 L41.28,67.31 L41.10,66.91 L41.06,66.80 L41.03,66.69 L41.00,66.58 L40.93,66.14 L40.91,65.97 L39.86,35.89 L28.36,40.08 L27.97,40.28 z " />
 </vector>
